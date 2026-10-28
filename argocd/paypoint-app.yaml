@@ -1,0 +1,30 @@
+# GitOps: Argo CD keeps the cluster in sync with k8s/overlays/gitops on the main branch.
+# Changes go through git (pull request), never through kubectl.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: paypoint
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vzuliani97/platformops.git
+    targetRevision: main
+    path: k8s/overlays/gitops
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: paypoint
+  syncPolicy:
+    automated:
+      prune: true # delete resources removed from git
+      selfHeal: true # revert manual changes made in the cluster
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
