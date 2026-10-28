@@ -1,0 +1,37 @@
+groups:
+  - name: paypoint
+    rules:
+      - alert: PayPointBackendDown
+        expr: up{job="paypoint-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend pod {{ $labels.pod }} is not responding to scrapes"
+
+      - alert: PayPointHighErrorRate
+        expr: |
+          sum(rate(paypoint_http_request_duration_seconds_count{status=~"5.."}[5m]))
+            / sum(rate(paypoint_http_request_duration_seconds_count[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 5% of API requests are failing with 5xx"
+
+      - alert: PayPointSlowRequests
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(paypoint_http_request_duration_seconds_bucket[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 API latency above 1 second"
+
+      # Sales stuck in PENDING mean the provider is not answering: money is reserved but not settled.
+      - alert: PayPointSalesPending
+        expr: sum(increase(paypoint_sales_total{status="PENDING"}[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sales are being left PENDING: check the top-up provider"
