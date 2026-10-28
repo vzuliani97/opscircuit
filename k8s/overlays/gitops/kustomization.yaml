@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Deployed by Argo CD (argocd/paypoint-app.yaml). Secrets never live in git:
+# the "paypoint-secrets" Secret is created out of band with `make gitops-secret`.
+resources:
+  - ../../base
+images:
+  # Published by the PayPoint release workflow to GitHub Container Registry.
+  - name: paypoint-backend
+    newName: ghcr.io/vzuliani97/paypoint-backend
+    newTag: main
+  - name: paypoint-frontend
+    newName: ghcr.io/vzuliani97/paypoint-frontend
+    newTag: main
+patches:
+  # "main" is a moving tag, so always pull it on restart.
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
