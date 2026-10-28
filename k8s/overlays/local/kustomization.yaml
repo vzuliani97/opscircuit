@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Must match the base namespace, otherwise the generated Secret lands elsewhere
+# and kustomize does not rewrite the secretKeyRef names to the hashed name.
+namespace: paypoint
+resources:
+  - ../../base
+images:
+  # Images built from ../paypoint and loaded into kind with `make images`.
+  - name: paypoint-backend
+    newTag: local
+  - name: paypoint-frontend
+    newTag: local
+secretGenerator:
+  # secrets.env is git-ignored and created by `make secrets`. The generated name gets a content hash,
+  # so changing a secret rolls the pods that use it.
+  - name: paypoint-secrets
+    envs:
+      - secrets.env
