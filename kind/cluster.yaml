@@ -1,0 +1,16 @@
+# Local cluster: one control plane and two workers, so pods really spread across nodes.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: platformops
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # NodePort services exposed on the host.
+      - containerPort: 30082 # PayPoint web
+        hostPort: 8082
+      - containerPort: 30030 # Grafana
+        hostPort: 3030
+      - containerPort: 30090 # Prometheus
+        hostPort: 9090
+  - role: worker
+  - role: worker

@@ -1,0 +1,7 @@
+bin/
+k8s/overlays/local/secrets.env
+terraform/**/.terraform/
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/**/terraform.tfvars
+.DS_Store
