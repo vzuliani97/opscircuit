@@ -1,0 +1,4 @@
+region             = "us-east-1"
+environment        = "demo"
+admin_cidrs        = ["203.0.113.10/32"] # replace with your public IP
+kubernetes_version = "1.34"
