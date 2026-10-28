@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: observability
+resources:
+  - namespace.yaml
+  - prometheus.yaml
+  - grafana-provisioning.yaml
+  - grafana.yaml
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml
+      - alerts.yml
+  - name: grafana-dashboards
+    files:
+      - paypoint.json=dashboards/paypoint.json
