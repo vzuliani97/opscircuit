@@ -5,13 +5,17 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: jobs only read the repo unless they declare more.
+permissions:
+  contents: read
+
 jobs:
   manifests:
     name: Kubernetes manifests (kustomize + kubeconform)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Validate every rendered manifest against the Kubernetes schema
         run: make validate
 
@@ -23,8 +27,8 @@ jobs:
       run:
         working-directory: terraform/aws
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.16.7
       - run: terraform fmt -check -recursive
@@ -36,5 +40,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: shellcheck scripts/*.sh
+
+  security:
+    name: Security (secrets, dependencies, IaC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan the whole history, not just the last commit
+      - name: Scan git history for secrets (Gitleaks)
+        run: docker run --rm -v "$PWD":/repo zricethezav/gitleaks:v8.30.1 git /repo --no-banner --redact
+      - name: Scan Terraform and Kubernetes manifests (Checkov)
+        run: |
+          mkdir -p rendered
+          kubectl kustomize k8s/overlays/gitops > rendered/paypoint.yaml
+          kubectl kustomize observability > rendered/observability.yaml
+          docker run --rm -v "$PWD":/src bridgecrew/checkov:3.4.0 --config-file /src/.checkov.yaml

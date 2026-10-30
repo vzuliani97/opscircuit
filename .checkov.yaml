@@ -1,0 +1,25 @@
+# Checkov configuration used by CI. Findings that are accepted on purpose are listed here with the reason,
+# so the decision is reviewable instead of hidden.
+directory:
+  - /src/terraform/aws
+  - /src/rendered
+framework:
+  - terraform
+  - kubernetes
+compact: true
+quiet: true
+skip-download: true
+skip-check:
+  # CPU limits cause CFS throttling and latency spikes; we set CPU requests (scheduling) and memory limits only.
+  - CKV_K8S_11
+  # Twelve-factor apps read secrets from env vars; mounting them as files would need app changes for little gain here.
+  - CKV_K8S_35
+  # Application images use the moving "main" tag in the GitOps overlay; third-party images are pinned by digest.
+  # Pinning app images by digest is the next step (Argo CD Image Updater), see README.
+  - CKV_K8S_43
+  - CKV_K8S_15
+  # Images run as their own non-root users (node 1000, nginx 101, grafana 472, postgres 70); remapping UIDs adds no
+  # protection over runAsNonRoot + dropped capabilities + no privilege escalation.
+  - CKV_K8S_40
+  # Prometheus needs its service account token for Kubernetes service discovery (read-only RBAC on pods).
+  - CKV_K8S_38

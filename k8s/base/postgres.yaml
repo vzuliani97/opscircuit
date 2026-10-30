@@ -29,9 +29,19 @@ spec:
       labels:
         app: postgres
     spec:
+      automountServiceAccountToken: false
+      # The official image runs as the "postgres" user (uid 70); fsGroup makes the volume writable for it.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
-          image: postgres:16-alpine
+          # Pinned by digest: the exact image that was tested, immune to tag changes upstream.
+          image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
           ports:
             - name: postgres
               containerPort: 5432
@@ -63,9 +73,24 @@ spec:
               memory: 256Mi
             limits:
               memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            # Writable paths PostgreSQL needs besides its data directory.
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: data
