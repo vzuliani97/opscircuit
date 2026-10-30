@@ -18,7 +18,7 @@ Delivery and operations platform for [PayPoint](https://github.com/vzuliani97/pa
 | NetworkPolicy: an unlabeled pod tries to reach PostgreSQL | `no response` (blocked) | Negative and positive probe |
 | Game day: total backend outage | Found an alert that could never fire; fixed and re-verified | [Postmortem](docs/incidents/2026-10-30-postmortem.md) |
 | Game day: broken release | Health 200 throughout; rollout stalled; rollback in one command | `docs/incidents/drill-bad-deploy.log` |
-| Checkov on Terraform + rendered manifests | 0 failures (33 TF checks, 438 K8s checks; accepted findings documented) | `.checkov.yaml` |
+| Checkov on Terraform + rendered manifests | 0 failed checks (33 Terraform, 438 Kubernetes), with accepted findings documented. A clean static scan is not proof of no risk | `.checkov.yaml` |
 | Schema validation of every rendered manifest | 39/39 valid | `make validate` |
 | `terraform validate` and `fmt` | Pass | `make tf-validate` |
 | **GitOps from GitHub**: Argo CD syncs `main`, pulls multi-arch images from GHCR | Synced/Healthy; smoke test passes | Revision on the cluster equals `main` |
