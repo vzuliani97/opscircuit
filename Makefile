@@ -8,7 +8,7 @@ TF           := docker run --rm -v $(CURDIR)/terraform/aws:/work -w /work hashic
 ARGOCD_VERSION := v3.5.6
 K8S_SCHEMA_VERSION := 1.33.0
 
-.PHONY: up tools cluster images secrets deploy observability argocd gitops-secret gitops argocd-password \
+.PHONY: drill-outage drill-bad-deploy up tools cluster images secrets deploy observability argocd gitops-secret gitops argocd-password \
         argocd-ui smoke status validate tf-validate down
 
 ## Full local platform: cluster + PayPoint + Prometheus/Grafana
@@ -69,6 +69,13 @@ argocd-ui:
 
 smoke:
 	./scripts/smoke-test.sh
+
+## Game-day drills (see docs/incidents/2026-10-30-postmortem.md)
+drill-outage:
+	./scripts/drills.sh outage
+
+drill-bad-deploy:
+	./scripts/drills.sh bad-deploy
 
 status:
 	$(KUBECTL) get pods -A -o wide | grep -E 'NAMESPACE|paypoint|monitoring|argocd'
