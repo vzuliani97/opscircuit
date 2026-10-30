@@ -21,8 +21,9 @@ Delivery and operations platform for [PayPoint](https://github.com/vzuliani97/pa
 | Checkov on Terraform + rendered manifests | 0 failures (33 TF checks, 438 K8s checks; accepted findings documented) | `.checkov.yaml` |
 | Schema validation of every rendered manifest | 39/39 valid | `make validate` |
 | `terraform validate` and `fmt` | Pass | `make tf-validate` |
-| Argo CD installed; Applications accepted by the live API | Pass | Server-side dry run |
-| **Argo CD syncing from GitHub** | **Pending**: needs the repos published | — |
+| **GitOps from GitHub**: Argo CD syncs `main`, pulls multi-arch images from GHCR | Synced/Healthy; smoke test passes | Revision on the cluster equals `main` |
+| **Self-heal**: Deployment deleted by hand | Recreated by Argo CD in 2 s | Drill 2026-10-30 |
+| CI on GitHub (validate, Terraform, Checkov, Gitleaks, shellcheck) | Green | Actions tab |
 | **Terraform applied on AWS** | **Never applied** (it would cost money) | — |
 
 ## Architecture
