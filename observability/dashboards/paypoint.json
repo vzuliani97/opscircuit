@@ -29,7 +29,12 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none"
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
         },
         "overrides": []
       },
@@ -67,7 +72,12 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none"
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
         },
         "overrides": []
       },
@@ -105,7 +115,12 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none"
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
         },
         "overrides": []
       },
@@ -143,7 +158,12 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "none"
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "yellow"
+          }
         },
         "overrides": []
       },
@@ -257,7 +277,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -274,7 +296,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(paypoint_http_request_duration_seconds_count{route=~\"/api.*\",status=~\"5..\"}[5m])) / sum(rate(paypoint_http_request_duration_seconds_count{route=~\"/api.*\"}[5m]))",
+          "expr": "sum(rate(paypoint_http_request_duration_seconds_count{route=~\"/api.*\",status=~\"5..\"}[5m]) or vector(0)) / sum(rate(paypoint_http_request_duration_seconds_count{route=~\"/api.*\"}[5m]))",
           "legendFormat": "5xx"
         }
       ]
