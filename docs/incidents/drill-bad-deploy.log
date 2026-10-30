@@ -1,0 +1,14 @@
+01:21:08  START bad-deploy drill. Current revision: 1. Health: 200
+01:21:08  Inject: release with a broken DATABASE_URL
+01:21:08  Health: 200. Pods: 1/1/Running 1/1/Running 0/1/ContainerCreating 
+01:21:19  Health: 200. Pods: 1/1/Running 1/1/Running 0/1/CrashLoopBackOff 
+01:21:29  Health: 200. Pods: 1/1/Running 1/1/Running 0/1/CrashLoopBackOff 
+01:21:39  Health: 200. Pods: 1/1/Running 1/1/Running 0/1/CrashLoopBackOff 
+01:21:49  Health: 200. Pods: 1/1/Running 1/1/Running 0/1/Running 
+01:22:00  Health: 200. Pods: 1/1/Running 1/1/Running 0/1/CrashLoopBackOff 
+01:22:10  Health: 200. Pods: 1/1/Running 1/1/Running 0/1/CrashLoopBackOff 
+01:22:20  Health: 200. Pods: 1/1/Running 1/1/Running 0/1/CrashLoopBackOff 
+01:22:35  Rollout status: error: timed out waiting for the condition
+01:22:35  Recover: kubectl rollout undo
+Warning: resource deployments/backend was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.
+01:22:36  END. Revision: 3. Health: 200. Pods: 1/1/Running 1/1/Running 0/1/Error 

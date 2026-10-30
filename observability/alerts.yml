@@ -9,6 +9,16 @@ groups:
         annotations:
           summary: "Backend pod {{ $labels.pod }} is not responding to scrapes"
 
+      # Found in the outage drill (docs/incidents): when every backend pod is gone, Prometheus has no target
+      # left, the `up` series disappears and the alert above can never fire. absent() covers total outages.
+      - alert: PayPointBackendAbsent
+        expr: absent(up{job="paypoint-backend"} == 1)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No healthy PayPoint backend pod is being scraped: the API is down"
+
       - alert: PayPointHighErrorRate
         expr: |
           sum(rate(paypoint_http_request_duration_seconds_count{status=~"5.."}[5m]))

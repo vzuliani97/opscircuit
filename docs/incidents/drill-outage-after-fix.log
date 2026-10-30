@@ -1,0 +1,17 @@
+01:16:16  START outage drill. Health: 200. Alerts: none
+01:16:16  Inject: scale backend to 0 replicas
+01:16:21  Health: 000. Alerts: none
+01:16:39  Health: 000. Alerts: none
+01:16:57  Health: 000. Alerts: PayPointBackendAbsent(pending)
+01:17:15  Health: 000. Alerts: PayPointBackendAbsent(pending)
+01:17:34  Health: 000. Alerts: PayPointBackendAbsent(pending)
+01:17:52  Health: 000. Alerts: PayPointBackendAbsent(pending)
+01:18:10  Health: 000. Alerts: PayPointBackendAbsent(firing)
+01:18:28  Health: 000. Alerts: PayPointBackendAbsent(firing)
+01:18:46  Health: 000. Alerts: PayPointBackendAbsent(firing)
+01:19:05  Health: 000. Alerts: PayPointBackendAbsent(firing)
+01:19:23  Health: 000. Alerts: PayPointBackendAbsent(firing)
+01:19:41  Health: 000. Alerts: PayPointBackendAbsent(firing)
+01:19:56  Recover: scale backend back to 2 replicas
+01:20:00  Recovered. Health: 200
+01:20:31  END. Alerts: none
