@@ -2,143 +2,105 @@
 
 [![CI](https://github.com/vzuliani97/platformops/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/platformops/actions/workflows/ci.yml)
 
-Plataforma para desplegar y operar [PayPoint](https://github.com/vzuliani97/paypoint) en Kubernetes: manifiestos con Kustomize, GitOps con Argo CD, métricas y alertas con Prometheus y Grafana, e infraestructura en AWS (VPC, EKS, RDS, ECR) definida en Terraform. Todo corre localmente sin costo sobre un clúster kind de 3 nodos.
+Delivery and operations platform for [PayPoint](https://github.com/vzuliani97/paypoint): Kubernetes manifests with Kustomize, GitOps with Argo CD, Prometheus and Grafana with alerts, hardened workloads, game-day drills with a postmortem, and the AWS production equivalent in Terraform. Everything runs locally at zero cost on a 3-node kind cluster.
 
-*English: Kubernetes delivery platform for the PayPoint app. Kustomize overlays, Argo CD GitOps, Prometheus + Grafana with alert rules, hardened workloads (non-root, read-only filesystems, NetworkPolicies, Pod Security Admission, PDB, topology spread), and Terraform for AWS (VPC, EKS, RDS, ECR) validated in CI. Runs locally at zero cost on a 3-node kind cluster.*
+**Problem:** applications go down, get misconfigured or receive broken releases. The team has to notice fast, protect users, and recover with one command.
 
-## Arquitectura
+![Grafana dashboard provisioned as code: pods, sales by status, request rate, p95 latency, error ratio, memory](docs/screenshots/grafana-dashboard.png)
+
+## What is verified (on the local cluster)
+
+| Check | Result | Evidence |
+|---|---|---|
+| End-to-end smoke test: web, health, login, a confirmed sale, metrics | Pass | `make smoke` |
+| Signed partner sale through nginx inside the cluster | 201 | `scripts/` + PayPoint partner client |
+| Prometheus scrapes both backend replicas, on different nodes | 2/2 up | `docs/screenshots/prometheus-targets.png` |
+| NetworkPolicy: an unlabeled pod tries to reach PostgreSQL | `no response` (blocked) | Negative and positive probe |
+| Game day: total backend outage | Found an alert that could never fire; fixed and re-verified | [Postmortem](docs/incidents/2026-10-30-postmortem.md) |
+| Game day: broken release | Health 200 throughout; rollout stalled; rollback in one command | `docs/incidents/drill-bad-deploy.log` |
+| Checkov on Terraform + rendered manifests | 0 failures (33 TF checks, 438 K8s checks; accepted findings documented) | `.checkov.yaml` |
+| Schema validation of every rendered manifest | 39/39 valid | `make validate` |
+| `terraform validate` and `fmt` | Pass | `make tf-validate` |
+| Argo CD installed; Applications accepted by the live API | Pass | Server-side dry run |
+| **Argo CD syncing from GitHub** | **Pending**: needs the repos published | — |
+| **Terraform applied on AWS** | **Never applied** (it would cost money) | — |
+
+## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph kind["Clúster kind (1 control plane + 2 workers)"]
+  subgraph kind["kind cluster: 1 control plane + 2 workers"]
     subgraph paypoint["namespace paypoint"]
-      FE[frontend x2<br/>nginx sin root] --> BE[backend x2<br/>NestJS]
+      FE[frontend x2<br/>non-root nginx] --> BE[backend x2<br/>NestJS]
       BE --> PG[(postgres<br/>StatefulSet + PVC)]
     end
     subgraph monitoring["namespace monitoring"]
-      PR[Prometheus] -->|descubre pods| BE
+      PR[Prometheus] -->|pod discovery| BE
       GR[Grafana] --> PR
     end
-    subgraph argocd["namespace argocd"]
-      AC[Argo CD]
-    end
+    AC[Argo CD]
   end
-  U[Navegador :8082] --> FE
-  AC -->|sincroniza| paypoint
-  GH[(GitHub<br/>platformops)] --> AC
-  REG[(GHCR<br/>imágenes)] --> paypoint
+  U[Browser :8082] --> FE
+  GH[(GitHub)] --> AC -->|sync| paypoint
+  REG[(GHCR images)] --> paypoint
 ```
 
-### Flujo de entrega (GitOps)
+GitOps flow: a push to PayPoint runs its tests and publishes images to GHCR; Argo CD keeps the cluster in sync with `k8s/overlays/gitops` on `main` (`prune` + `selfHeal`). Nobody applies changes with `kubectl` in GitOps mode.
 
-```mermaid
-sequenceDiagram
-  participant Dev as Desarrollador
-  participant PP as Repo paypoint
-  participant CI as GitHub Actions
-  participant GHCR as GHCR
-  participant PO as Repo platformops
-  participant AC as Argo CD
-  participant K as Kubernetes
-  Dev->>PP: push a main
-  PP->>CI: pruebas (unitarias, e2e con PostgreSQL)
-  CI->>GHCR: publica imágenes :main y :sha
-  Dev->>PO: cambio de manifiestos (pull request)
-  AC->>PO: detecta el cambio en main
-  AC->>K: sincroniza (prune + self-heal)
-```
+## Quick start
 
-Nadie aplica cambios al clúster con `kubectl`: git es la fuente de verdad. Si alguien edita un recurso a mano, Argo CD lo revierte (`selfHeal`).
-
-## Inicio rápido
-
-Requisitos: Docker, kubectl y el repo `paypoint` clonado al lado de este. `make tools` descarga `kind` y `kubeconform` en `./bin`, con verificación SHA-256 y sin instalar nada en el sistema.
+Requirements: Docker, kubectl, and the `paypoint` repo cloned next to this one. `make tools` downloads pinned `kind` and `kubeconform` into `./bin` and verifies their SHA-256; nothing is installed system-wide.
 
 ```bash
-make up          # clúster + imágenes de PayPoint + despliegue + Prometheus/Grafana + prueba de humo
+make up              # cluster + PayPoint + Prometheus/Grafana + smoke test (~5 min)
+make drill-outage    # game day: total outage
+make drill-bad-deploy
+make down
 ```
 
-| Servicio | URL |
+| Service | URL |
 |---|---|
-| PayPoint | http://localhost:8082 (`cajero@paypoint.local` / `paypoint-demo`) |
-| Grafana | http://localhost:3030 (dashboard "PayPoint overview", acceso de solo lectura) |
-| Prometheus | http://localhost:9090 (targets y alertas) |
+| PayPoint | http://localhost:8082 |
+| Grafana (read-only anonymous) | http://localhost:3030 |
+| Prometheus | http://localhost:9090 |
 
-Otros comandos: `make status`, `make smoke`, `make validate`, `make tf-validate`, `make down`.
+## Reliability
 
-**Modo GitOps:** `make gitops` instala Argo CD, crea el Secret fuera de git y registra las Applications de `argocd/`. Desde ese momento, Argo CD despliega `k8s/overlays/gitops` (imágenes de GHCR) desde la rama `main`. `make argocd-ui` y `make argocd-password` dan acceso a la consola.
+- 2 replicas spread across nodes (`topologySpreadConstraints`), a `PodDisruptionBudget`, and rolling updates with `maxUnavailable: 0`.
+- Separate startup, readiness and liveness probes, so startup migrations never trigger restarts.
+- Migrations run at startup under a PostgreSQL advisory lock, so only one replica applies them.
+- **Alerts:** backend absent (total outage), backend down, more than 5% 5xx, p95 above 1 s, and sales stuck `PENDING` (provider not answering).
 
-## Estructura
+## Security
 
-| Ruta | Contenido |
-|---|---|
-| `kind/cluster.yaml` | Clúster local de 3 nodos y puertos expuestos |
-| `k8s/base/` | PostgreSQL, backend, frontend y NetworkPolicies |
-| `k8s/overlays/local/` | Imágenes cargadas en kind y Secret generado desde `secrets.env` (no versionado) |
-| `k8s/overlays/gitops/` | Imágenes de GHCR, lo que despliega Argo CD |
-| `observability/` | Prometheus (descubrimiento de pods y alertas) y Grafana (datasource y dashboard provisionados) |
-| `argocd/` | Applications de Argo CD |
-| `terraform/aws/` | VPC, EKS, RDS y ECR |
-| `scripts/` | Instalación de herramientas y prueba de humo |
+- Every workload runs as non-root, with read-only root filesystems, no privilege escalation, all capabilities dropped and seccomp `RuntimeDefault`. PostgreSQL runs as uid 70 with its writable paths on `emptyDir`.
+- Pod Security Admission: `baseline` enforced in `paypoint`, `restricted` enforced in `monitoring`.
+- Default-deny NetworkPolicies: PostgreSQL accepts only the backend; the backend accepts only the frontend and Prometheus. Verified with a blocked probe and an allowed one.
+- Third-party images are pinned by digest. Secrets stay out of git: the local overlay generates them from an ignored file, and GitOps creates them out of band.
+- Prometheus has a read-only ClusterRole on pods only.
+- CI: Checkov, Gitleaks over the full history, kubeconform, `terraform validate`, shellcheck, SHA-pinned actions and a least-privilege token.
 
-## Decisiones de diseño
+## Terraform (AWS production equivalent, never applied)
 
-**Disponibilidad**
-- 2 réplicas del backend y del frontend. `topologySpreadConstraints` reparte los pods en nodos distintos, y un `PodDisruptionBudget` mantiene al menos uno disponible durante mantenimientos.
-- Rolling update con `maxUnavailable: 0`: un despliegue nunca baja la capacidad.
-- `startupProbe`, `readinessProbe` y `livenessProbe` separadas: las migraciones al arrancar no hacen que Kubernetes reinicie el pod.
-- Las migraciones corren al iniciar cada réplica, protegidas por un *advisory lock* de PostgreSQL, así que solo una las aplica.
+- VPC across 3 explicit AZs with private, public and isolated database subnets.
+- EKS (official module v21): spot nodes in dev, on-demand in production, and the API endpoint restricted to allowed CIDRs (`0.0.0.0/0` is rejected by validation).
+- RDS PostgreSQL 16: private, encrypted, **TLS enforced**, IAM authentication, password generated into Secrets Manager, slow-query and DDL logging, Performance Insights, backups.
+- ECR: immutable tags, scan on push, KMS encryption, lifecycle policy.
+- `environment = "production"` turns on Multi-AZ, deletion protection, a final snapshot and one NAT per AZ.
 
-**Seguridad**
-- Contenedores sin root, sistema de archivos de solo lectura, sin escalamiento de privilegios, `capabilities: drop ALL` y seccomp `RuntimeDefault`.
-- Pod Security Admission en los namespaces: `baseline` obligatorio en `paypoint` y `restricted` en `monitoring`.
-- NetworkPolicies con denegación por defecto: PostgreSQL solo acepta conexiones del backend, y el backend solo del frontend y de Prometheus.
-- Secretos fuera de git: el overlay local los genera desde un archivo ignorado, y en GitOps se crean aparte.
-- `/metrics` no se expone hacia afuera, porque Nginx solo enruta `/api` y `/health`.
-- Prometheus usa una ServiceAccount con permiso de solo lectura sobre pods y nada más.
+Estimated cost of the demo environment in us-east-1: about **USD 140/month** (EKS control plane about 73, NAT about 33, 2 spot t3.medium about 20, RDS about 15). These are reference prices; check them with the AWS calculator.
 
-**Observabilidad**
-- Prometheus descubre los pods anotados con `prometheus.io/scrape` y recoge métricas de cada réplica por separado, no a través del Service, para que un pod con problemas no quede oculto.
-- 4 alertas: backend caído, más de 5% de errores 5xx, p95 mayor a 1 s y ventas quedando en `PENDING` (el proveedor de recargas no responde).
-- Grafana con datasource y dashboard provisionados como código: tráfico, latencia p95, errores, ventas por estado y canal, y memoria por pod.
+## Known limitations and next steps
 
-## Verificado
+- Alerts are visible only in Prometheus. Next: Alertmanager routing and a blackbox check of the public URL (open action items in the postmortem).
+- The app images use the moving `main` tag in GitOps. Next: Argo CD Image Updater, or a commit that pins the SHA.
+- Secrets are not managed by External Secrets or Sealed Secrets yet.
+- No Ingress or Gateway API with TLS, no HPA, no centralized logs (Loki).
 
-Probado en el clúster local:
+## Interview guide
 
-| Prueba | Resultado |
-|---|---|
-| Esquemas de los 39 manifiestos renderizados (`make validate`) | 0 errores |
-| Prueba de humo: web, health, login, venta confirmada, métricas | OK |
-| Venta firmada con HMAC de un integrador, pasando por Nginx | 201 |
-| Prometheus recoge las 2 réplicas, cada una en un nodo distinto | 2/2 `up` |
-| Un pod sin la etiqueta `app=backend` intenta conectarse a PostgreSQL | `no response` (bloqueado) |
-| Un pod con la etiqueta `app=backend` | `accepting connections` |
-| Argo CD v3.5.6 instalado; Applications validadas contra la API del clúster | OK |
-| `terraform validate` y `fmt -check` | OK |
+[INTERVIEW_GUIDE.md](INTERVIEW_GUIDE.md)
 
-## AWS con Terraform
+## License
 
-`terraform/aws` define el equivalente productivo:
-
-- **VPC** en 3 zonas: subredes privadas para los nodos, públicas para balanceadores y aisladas para la base de datos.
-- **EKS** (módulo oficial `terraform-aws-modules/eks` v21) con nodos *spot* en desarrollo y *on-demand* en producción, add-ons gestionados y el endpoint de la API restringido a IPs permitidas (la validación rechaza `0.0.0.0/0`).
-- **RDS PostgreSQL 16** privado, cifrado, con backups y la contraseña generada por AWS en **Secrets Manager** (nunca en el código ni en el estado). Solo los nodos de EKS pueden conectarse.
-- **ECR** con tags inmutables, escaneo de vulnerabilidades al subir y una política de retención.
-- `environment = "production"` activa Multi-AZ, protección contra borrado, snapshot final y un NAT por zona.
-
-**Nunca se ha aplicado** (`terraform apply`), porque genera costos. Costo aproximado del entorno demo en us-east-1, con precios de referencia que hay que confirmar en la calculadora de AWS: plano de control EKS ~USD 73/mes, NAT Gateway ~USD 33/mes más tráfico, 2 nodos t3.medium spot ~USD 20/mes, RDS db.t4g.micro ~USD 15/mes. **Total: unos USD 140/mes.** El CI solo ejecuta `fmt` y `validate`.
-
-```bash
-cd terraform/aws
-cp terraform.tfvars.example terraform.tfvars   # tu IP en admin_cidrs
-terraform init && terraform plan                # requiere credenciales de AWS
-```
-
-## Siguientes pasos
-
-- Secretos con **External Secrets Operator** leyendo AWS Secrets Manager, o con **Sealed Secrets**.
-- **Argo CD Image Updater** o un commit automático que fije el tag por SHA, en vez de usar el tag móvil `main`.
-- Ingress con **Gateway API** y TLS (cert-manager).
-- **HPA** con metrics-server, **Alertmanager** para notificar, y **Loki** para logs.
-- Escaneo de IaC (Checkov o tfsec) y de imágenes (Trivy) en el CI, y autenticación del CI con AWS por **OIDC**, sin llaves de larga duración.
+MIT. All code is my own.
