@@ -1,16 +1,14 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
 locals {
-  azs        = slice(data.aws_availability_zones.available.names, 0, 3)
+  azs        = var.availability_zones
   production = var.environment == "production"
 }
 
 # Network: private subnets for nodes, public subnets for load balancers, isolated subnets for the database.
+# Official registry modules, pinned to exact versions and locked in .terraform.lock.hcl.
 module "vpc" {
+  #checkov:skip=CKV_TF_1:Registry module pinned to an exact version; provider hashes are in the lock file
   source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 6.7"
+  version = "6.7.3"
 
   name = var.name
   cidr = var.vpc_cidr
@@ -32,8 +30,9 @@ module "vpc" {
 }
 
 module "eks" {
+  #checkov:skip=CKV_TF_1:Registry module pinned to an exact version; provider hashes are in the lock file
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 21.29"
+  version = "21.29.0"
 
   name               = var.name
   kubernetes_version = var.kubernetes_version
@@ -89,7 +88,35 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_nodes" {
   description                  = "PostgreSQL from EKS nodes"
 }
 
+# Logs slow queries (over 1 s) and schema changes to CloudWatch.
+resource "aws_db_parameter_group" "postgres" {
+  name_prefix = "${var.name}-pg16-"
+  family      = "postgres16"
+
+  parameter {
+    name  = "log_statement"
+    value = "ddl"
+  }
+
+  parameter {
+    name  = "log_min_duration_statement"
+    value = "1000"
+  }
+
+  # Reject unencrypted connections: data in transit is always TLS.
+  parameter {
+    name  = "rds.force_ssl"
+    value = "1"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 resource "aws_db_instance" "postgres" {
+  #checkov:skip=CKV_AWS_118:Enhanced monitoring needs an extra IAM role and adds cost; Performance Insights covers the demo
+  #checkov:skip=CKV_AWS_354:Performance Insights uses the AWS-managed KMS key; a customer-managed key adds cost for a demo
   identifier     = var.name
   engine         = "postgres"
   engine_version = "16"
@@ -103,17 +130,23 @@ resource "aws_db_instance" "postgres" {
   username = "paypoint"
   # RDS generates the password and keeps it in Secrets Manager: it never appears in Terraform state or code.
   manage_master_user_password = true
+  # Pods can authenticate with short-lived IAM tokens instead of a static password.
+  iam_database_authentication_enabled = true
 
   db_subnet_group_name   = module.vpc.database_subnet_group_name
   vpc_security_group_ids = [aws_security_group.db.id]
+  parameter_group_name   = aws_db_parameter_group.postgres.name
   publicly_accessible    = false
   multi_az               = local.production
 
-  backup_retention_period    = 7
-  auto_minor_version_upgrade = true
-  deletion_protection        = local.production
-  skip_final_snapshot        = !local.production
-  final_snapshot_identifier  = local.production ? "${var.name}-final" : null
+  backup_retention_period         = 7
+  copy_tags_to_snapshot           = true
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+  performance_insights_enabled    = true
+  auto_minor_version_upgrade      = true
+  deletion_protection             = local.production
+  skip_final_snapshot             = !local.production
+  final_snapshot_identifier       = local.production ? "${var.name}-final" : null
 }
 
 # Container registries for the PayPoint images.
@@ -127,8 +160,9 @@ resource "aws_ecr_repository" "app" {
     scan_on_push = true
   }
 
+  # KMS with the AWS-managed key (aws/ecr): audited key usage, no extra key cost.
   encryption_configuration {
-    encryption_type = "AES256"
+    encryption_type = "KMS"
   }
 }
 

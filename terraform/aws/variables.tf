@@ -16,6 +16,12 @@ variable "name" {
   default     = "paypoint"
 }
 
+variable "availability_zones" {
+  description = "Explicit AZs, so the network never changes silently when AWS adds a zone"
+  type        = list(string)
+  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+}
+
 variable "vpc_cidr" {
   description = "VPC address range"
   type        = string
