@@ -1,0 +1,40 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"PayPointBackendAbsent\", namespace=\"paypoint\", service=\"paypoint-backend\"}",
+  "status": "firing",
+  "receiver": "n8n-incidents",
+  "groupLabels": {
+    "alertname": "BillingWorkerDown",
+    "namespace": "paypoint",
+    "service": "billing-worker"
+  },
+  "commonLabels": {
+    "alertname": "BillingWorkerDown",
+    "namespace": "paypoint",
+    "service": "billing-worker",
+    "severity": "critical"
+  },
+  "commonAnnotations": {
+    "summary": "billing-worker is not responding"
+  },
+  "externalURL": "http://alertmanager:9093",
+  "truncatedAlerts": 0,
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "BillingWorkerDown",
+        "namespace": "paypoint",
+        "service": "billing-worker",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "billing-worker is not responding"
+      },
+      "startsAt": "2026-10-31T12:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph",
+      "fingerprint": "synthetic-0001"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"PayPointBackendAbsent\", namespace=\"paypoint\", service=\"paypoint-backend\"}",
+  "status": "firing",
+  "receiver": "n8n-incidents",
+  "groupLabels": {
+    "service": "paypoint-backend"
+  },
+  "commonLabels": {
+    "namespace": "paypoint",
+    "service": "paypoint-backend"
+  },
+  "commonAnnotations": {},
+  "externalURL": "http://alertmanager:9093",
+  "truncatedAlerts": 0,
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PayPointBackendAbsent",
+        "namespace": "paypoint",
+        "service": "paypoint-backend",
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "No healthy PayPoint backend pod is being scraped: the API is down"
+      },
+      "startsAt": "2026-10-31T12:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph",
+      "fingerprint": "synthetic-0001"
+    },
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "PayPointHighErrorRate",
+        "namespace": "paypoint",
+        "service": "paypoint-backend",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "More than 5% of API requests are failing with 5xx"
+      },
+      "startsAt": "2026-10-31T12:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph",
+      "fingerprint": "synthetic-0002"
+    }
+  ]
+}

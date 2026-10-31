@@ -1,0 +1,62 @@
+{
+  "id": "incidentErrors01",
+  "name": "Incident intake error handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7e2d9c40-5b3a-4f8e-a1c2-9d8e7f6a5b01"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- The delivery row holds the original payload, so the failure can be replayed.\nINSERT INTO dead_letters (stage, delivery_id, execution_id, error)\nVALUES ('workflow',\n        (SELECT id FROM alert_deliveries WHERE execution_id = $1::text ORDER BY id DESC LIMIT 1),\n        $1::text, $2::text)\nRETURNING id AS dead_letter_id, delivery_id",
+        "options": {
+          "queryReplacement": "={{ [ String($json.execution.id), ($json.execution.lastNodeExecuted || 'unknown node') + ': ' + (($json.execution.error && $json.execution.error.message) || 'unknown error') ] }}"
+        }
+      },
+      "name": "Record workflow failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        0
+      ],
+      "id": "7e2d9c40-5b3a-4f8e-a1c2-9d8e7f6a5b02",
+      "credentials": {
+        "postgres": {
+          "id": "incidentStoreDb1",
+          "name": "Incident store (PostgreSQL)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Record workflow failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "UTC"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

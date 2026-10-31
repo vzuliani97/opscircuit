@@ -41,7 +41,31 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: shellcheck scripts/*.sh
+      - run: shellcheck scripts/*.sh ops-automation/scripts/*.sh ops-automation/db/*.sh ops-automation/n8n/*.sh
+
+  incident-lab:
+    name: n8n incident lab (integration tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ops-automation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate Compose, workflow and fixture JSON
+        run: make validate
+      - name: Start the lab (waits for health checks, bounded)
+        run: make up
+      - name: Integration tests
+        run: make test
+      - name: n8n security audit (report only; findings reviewed in docs)
+        run: make audit
+      - name: Container logs on failure
+        if: failure()
+        run: make logs
+      - name: Tear down
+        if: always()
+        run: make clean
 
   security:
     name: Security (secrets, dependencies, IaC)

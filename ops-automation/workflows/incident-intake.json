@@ -1,0 +1,538 @@
+{
+  "id": "incidentIntake01",
+  "name": "Incident intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alertmanager",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Alertmanager webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a01",
+      "webhookId": "5b0f3c8e-6a1d-4c2b-9f7e-2d4a8c1e9b30",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "alertWebhookAuth",
+          "name": "Alertmanager webhook token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Alertmanager webhook payload, version 4:\n// https://prometheus.io/docs/alerting/latest/configuration/#webhook_config\n// Anything malformed is rejected here, so later nodes can trust every field they read.\nconst MAX_ALERTS = 50;\nconst MAX_TEXT = 200;\nconst body = $input.first().json.body;\n\nconst reject = (reason) => [{\n  json: { valid: false, reason, payloadExcerpt: JSON.stringify(body ?? null).slice(0, 2000) },\n}];\nconst label = (labels, key, fallback) => {\n  const value = labels[key];\n  if (value === undefined) return fallback;\n  if (typeof value !== 'string' || value.trim() === '' || value.length > MAX_TEXT) return null;\n  return value.trim();\n};\n\nif (body === null || typeof body !== 'object' || Array.isArray(body)) return reject('body must be a JSON object');\nif (body.version !== '4') return reject('unsupported webhook payload version');\nif (!Array.isArray(body.alerts) || body.alerts.length === 0) return reject('alerts must be a non-empty array');\nif (body.alerts.length > MAX_ALERTS) return reject(`a delivery may carry at most ${MAX_ALERTS} alerts`);\n\nconst alerts = [];\nfor (const [i, alert] of body.alerts.entries()) {\n  if (alert === null || typeof alert !== 'object') return reject(`alerts[${i}] must be an object`);\n  const labels = alert.labels && typeof alert.labels === 'object' ? alert.labels : {};\n  if (!['firing', 'resolved'].includes(alert.status)) return reject(`alerts[${i}].status must be firing or resolved`);\n\n  const alertname = label(labels, 'alertname', null);\n  if (!alertname) return reject(`alerts[${i}].labels.alertname is missing or invalid`);\n  const service = label(labels, 'service', 'unknown');\n  const namespace = label(labels, 'namespace', 'default');\n  const severity = label(labels, 'severity', 'warning');\n  if (!service || !namespace || !severity) return reject(`alerts[${i}] has an invalid service, namespace or severity label`);\n\n  const startsAt = new Date(alert.startsAt);\n  if (typeof alert.startsAt !== 'string' || Number.isNaN(startsAt.getTime())) {\n    return reject(`alerts[${i}].startsAt is not a valid timestamp`);\n  }\n\n  alerts.push({\n    alertname, service, namespace, severity,\n    status: alert.status,\n    summary: String(alert.annotations?.summary ?? '').slice(0, 500),\n    startsAt: startsAt.toISOString(),\n    // Same alert in the same firing episode -> same incident. A new episode has a new startsAt.\n    identity: JSON.stringify([alertname, namespace, service, startsAt.toISOString()]),\n  });\n}\n\nreturn [{\n  json: {\n    valid: true,\n    receiver: String(body.receiver ?? '').slice(0, MAX_TEXT),\n    groupKey: String(body.groupKey ?? '').slice(0, 1000),\n    alerts,\n    payload: body,\n  },\n}];"
+      },
+      "name": "Validate and normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a02"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c0a1e7d2-6f1b-4a5e-8b4c-1d2e3f4a5b61",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Valid batch?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a03"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO rejected_events (reason, payload_excerpt) VALUES ($1::text, $2::text) RETURNING id",
+        "options": {
+          "queryReplacement": "={{ [ $json.reason, $json.payloadExcerpt ] }}"
+        }
+      },
+      "name": "Record rejected event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        520
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a04",
+      "credentials": {
+        "postgres": {
+          "id": "incidentStoreDb1",
+          "name": "Incident store (PostgreSQL)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'rejected', reason: $('Validate and normalize').first().json.reason } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "name": "Respond 400 rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        880,
+        520
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a05"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alert_deliveries (execution_id, receiver, group_key, alert_count, payload)\nVALUES ($1::text, $2::text, $3::text, $4::integer, $5::jsonb)\nRETURNING id AS delivery_id",
+        "options": {
+          "queryReplacement": "={{ [ $execution.id, $json.receiver, $json.groupKey, $json.alerts.length, $json.payload ] }}"
+        }
+      },
+      "name": "Record delivery",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        200
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a06",
+      "credentials": {
+        "postgres": {
+          "id": "incidentStoreDb1",
+          "name": "Incident store (PostgreSQL)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', deliveryId: $json.delivery_id, alerts: $('Validate and normalize').first().json.alerts.length } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "name": "Acknowledge 202",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        880,
+        200
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a07"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// One item per alert from here on. The delivery id links every later record back to the stored payload.\nconst batch = $('Validate and normalize').first().json;\nconst deliveryId = $('Record delivery').first().json.delivery_id;\nreturn batch.alerts.map((alert) => ({ json: { ...alert, deliveryId } }));"
+      },
+      "name": "Split alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        200
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a08"
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "binaryData": false,
+        "type": "SHA256",
+        "value": "={{ $json.identity }}",
+        "dataPropertyName": "fingerprint",
+        "encoding": "hex"
+      },
+      "name": "Fingerprint alert",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        200
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a09"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Always one row per alert: NULL columns mean the service is not in the catalog.\nSELECT s.owner, s.runbook, s.page_severities\nFROM (SELECT $1::text AS service) AS q\nLEFT JOIN service_catalog AS s ON s.service = q.service",
+        "options": {
+          "queryReplacement": "={{ [ $json.service ] }}",
+          "queryBatching": "independently"
+        }
+      },
+      "name": "Look up service",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1540,
+        200
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a10",
+      "credentials": {
+        "postgres": {
+          "id": "incidentStoreDb1",
+          "name": "Incident store (PostgreSQL)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Services missing from the catalog still get an owner and a runbook, so no alert is dropped\n// for lack of metadata; they page only on critical.\nconst DEFAULT_POLICY = { owner: 'platform-oncall', runbook: 'runbooks/unknown-service.md', page_severities: ['critical'] };\n\nconst alert = $('Fingerprint alert').item.json;\nconst inCatalog = typeof $json.owner === 'string';\nconst policy = inCatalog ? $json : DEFAULT_POLICY;\nconst pages = alert.status === 'firing' && policy.page_severities.includes(alert.severity);\n\nreturn {\n  json: {\n    ...alert,\n    owner: policy.owner,\n    runbook: policy.runbook,\n    enrichment: inCatalog ? 'catalog' : 'default',\n    initialNotifyStatus: pages ? 'pending' : 'skipped',\n  },\n};"
+      },
+      "name": "Apply catalog and policy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        200
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a11"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- ON CONFLICT takes a row lock, so concurrent deliveries of the same alert apply one at a time,\n-- and each one sees the row the previous one left (RETURNING old/new needs PostgreSQL 18).\nINSERT INTO incidents AS i (fingerprint, alertname, service, namespace, severity, status, summary,\n                            starts_at, owner, runbook, enrichment, notify_status, resolved_at)\nVALUES ($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, $8::timestamptz,\n        $9::text, $10::text, $11::text, $12::text, CASE WHEN $6::text = 'resolved' THEN now() END)\nON CONFLICT (fingerprint) DO UPDATE SET\n  occurrences = i.occurrences + CASE WHEN EXCLUDED.status = 'firing' THEN 1 ELSE 0 END,\n  status      = EXCLUDED.status,\n  resolved_at = CASE WHEN EXCLUDED.status = 'resolved' THEN now() ELSE i.resolved_at END,\n  last_seen   = now(),\n  -- A failed notification is retried by the next delivery of the same alert (Alertmanager repeat or replay).\n  notify_status = CASE WHEN i.notify_status = 'failed' THEN 'pending' ELSE i.notify_status END\nRETURNING new.*,\n  (old.id IS NULL) AS created,\n  ((old.id IS NULL AND new.notify_status = 'pending') OR coalesce(old.notify_status = 'failed', false)) AS should_notify",
+        "options": {
+          "queryReplacement": "={{ [ $json.fingerprint, $json.alertname, $json.service, $json.namespace, $json.severity, $json.status, $json.summary, $json.startsAt, $json.owner, $json.runbook, $json.enrichment, $json.initialNotifyStatus ] }}",
+          "queryBatching": "independently"
+        }
+      },
+      "name": "Upsert incident",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1980,
+        200
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a12",
+      "credentials": {
+        "postgres": {
+          "id": "incidentStoreDb1",
+          "name": "Incident store (PostgreSQL)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c0a1e7d2-6f1b-4a5e-8b4c-1d2e3f4a5b62",
+              "leftValue": "={{ $json.should_notify }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Should notify?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        200
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a13"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://mock-notifier:8099/notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.fingerprint }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ incident_id: $json.id, title: `[${$json.severity}] ${$json.alertname} on ${$json.service}`, summary: $json.summary, service: $json.service, namespace: $json.namespace, owner: $json.owner, runbook: $json.runbook, starts_at: $json.starts_at, occurrences: $json.occurrences }) }}",
+        "options": {
+          "timeout": 3000
+        }
+      },
+      "name": "Notify on-call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        100
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a14",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE incidents SET notify_status = 'sent', notified_at = now()\nWHERE id = $1::bigint RETURNING id, notify_status",
+        "options": {
+          "queryReplacement": "={{ [ $('Upsert incident').item.json.id ] }}",
+          "queryBatching": "independently"
+        }
+      },
+      "name": "Mark notified",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2640,
+        0
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a15",
+      "credentials": {
+        "postgres": {
+          "id": "incidentStoreDb1",
+          "name": "Incident store (PostgreSQL)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH failed AS (\n  UPDATE incidents SET notify_status = 'failed' WHERE id = $1::bigint RETURNING id\n)\nINSERT INTO dead_letters (stage, delivery_id, incident_id, execution_id, error)\nSELECT 'notify', $2::bigint, failed.id, $3::text, $4::text FROM failed\nRETURNING id AS dead_letter_id, incident_id",
+        "options": {
+          "queryReplacement": "={{ [ $('Upsert incident').item.json.id, $('Apply catalog and policy').item.json.deliveryId, $execution.id, ($json.error && $json.error.message) || JSON.stringify($json.error || 'notification failed') ] }}",
+          "queryBatching": "independently"
+        }
+      },
+      "name": "Dead-letter notification",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2640,
+        220
+      ],
+      "id": "0b6f2a10-1c1e-4a51-9a0e-6d1f0c3a7a16",
+      "credentials": {
+        "postgres": {
+          "id": "incidentStoreDb1",
+          "name": "Incident store (PostgreSQL)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Alertmanager webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate and normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and normalize": {
+      "main": [
+        [
+          {
+            "node": "Valid batch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid batch?": {
+      "main": [
+        [
+          {
+            "node": "Record delivery",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record rejected event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record rejected event": {
+      "main": [
+        [
+          {
+            "node": "Respond 400 rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record delivery": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge 202",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge 202": {
+      "main": [
+        [
+          {
+            "node": "Split alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split alerts": {
+      "main": [
+        [
+          {
+            "node": "Fingerprint alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fingerprint alert": {
+      "main": [
+        [
+          {
+            "node": "Look up service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look up service": {
+      "main": [
+        [
+          {
+            "node": "Apply catalog and policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply catalog and policy": {
+      "main": [
+        [
+          {
+            "node": "Upsert incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert incident": {
+      "main": [
+        [
+          {
+            "node": "Should notify?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should notify?": {
+      "main": [
+        [
+          {
+            "node": "Notify on-call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Notify on-call": {
+      "main": [
+        [
+          {
+            "node": "Mark notified",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dead-letter notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "incidentErrors01",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}
