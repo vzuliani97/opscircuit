@@ -24,6 +24,7 @@ Delivery and operations platform for [PayPoint](https://github.com/vzuliani97/pa
 | **GitOps from GitHub**: Argo CD syncs `main`, pulls multi-arch images from GHCR | Synced/Healthy; smoke test passes | Revision on the cluster equals `main` |
 | **Self-heal**: Deployment deleted by hand | Recreated by Argo CD in 2 s | Drill 2026-10-30 |
 | CI on GitHub (validate, Terraform, Checkov, Gitleaks, shellcheck) | Green | Actions tab |
+| **n8n incident automation lab**: authenticated Alertmanager webhook, validation, deduplication, enrichment, bounded retry, dead letters, replay, restart | 15/15 integration tests, locally and in CI | [Verification](docs/INCIDENT_AUTOMATION_VERIFICATION.md) |
 | **Terraform applied on AWS** | **Never applied** (it would cost money) | — |
 
 ## Architecture
@@ -45,6 +46,21 @@ flowchart LR
   GH[(GitHub)] --> AC -->|sync| paypoint
   REG[(GHCR images)] --> paypoint
 ```
+
+## Incident automation (n8n)
+
+[`ops-automation/`](ops-automation) adds a self-hosted n8n workflow between Alertmanager and on-call.
+- **Alertmanager** groups alerts.
+- **n8n:**
+  - authenticates and validates each delivery;
+  - stores it before answering 202;
+  - keeps one incident per firing episode;
+  - adds owner and runbook from a catalog in git;
+  - pages through a retrying notifier and dead-letters what still fails, for a safe replay.
+
+It runs in Docker Compose with a mock notifier, and its 15 integration tests run in CI. Read more in the [architecture](docs/INCIDENT_AUTOMATION_ARCHITECTURE.md), [runbook](docs/INCIDENT_AUTOMATION_RUNBOOK.md) and [verification](docs/INCIDENT_AUTOMATION_VERIFICATION.md).
+
+![n8n execution stopped by a database lock timeout; the error workflow records a replayable dead letter](docs/screenshots/n8n-execution-lock-timeout.png)
 
 GitOps flow: a push to PayPoint runs its tests and publishes images to GHCR; Argo CD keeps the cluster in sync with `k8s/overlays/gitops` on `main` (`prune` + `selfHeal`). Nobody applies changes with `kubectl` in GitOps mode.
 
@@ -93,7 +109,7 @@ Estimated cost of the demo environment in us-east-1: about **USD 140/month** (EK
 
 ## Known limitations and next steps
 
-- Alerts are visible only in Prometheus. Next: Alertmanager routing and a blackbox check of the public URL (open action items in the postmortem).
+- The cluster's Prometheus does not route to Alertmanager yet. The n8n incident lab runs in Docker Compose next to the cluster; wiring the two together is the next step, together with a blackbox check of the public URL (open action items in the postmortem).
 - The app images use the moving `main` tag in GitOps. Next: Argo CD Image Updater, or a commit that pins the SHA.
 - Secrets are not managed by External Secrets or Sealed Secrets yet.
 - No Ingress or Gateway API with TLS, no HPA, no centralized logs (Loki).
@@ -102,6 +118,8 @@ Estimated cost of the demo environment in us-east-1: about **USD 140/month** (EK
 
 [INTERVIEW_GUIDE.md](INTERVIEW_GUIDE.md)
 
-## License
+## License and provenance
 
-MIT. All code is my own.
+MIT.
+
+Independent portfolio reconstruction based on engineering patterns from professional work. It uses synthetic data and contains no employer code or confidential information. AI-assisted development tools were used; the implementation was reviewed and verified through tests and CI.
