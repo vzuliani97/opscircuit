@@ -8,3 +8,7 @@ updates:
     directory: /ops-automation
     schedule:
       interval: weekly
+    ignore:
+      # Majors (n8n, PostgreSQL, Node.js) are planned migrations re-verified with `make test`, not drive-by PRs.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
