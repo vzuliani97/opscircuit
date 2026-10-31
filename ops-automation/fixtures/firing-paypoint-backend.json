@@ -1,0 +1,22 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"PayPointBackendAbsent\", namespace=\"paypoint\", service=\"paypoint-backend\"}",
+  "status": "firing",
+  "receiver": "n8n-incidents",
+  "groupLabels": { "alertname": "PayPointBackendAbsent", "namespace": "paypoint", "service": "paypoint-backend" },
+  "commonLabels": { "alertname": "PayPointBackendAbsent", "namespace": "paypoint", "service": "paypoint-backend", "severity": "critical" },
+  "commonAnnotations": { "summary": "No healthy PayPoint backend pod is being scraped: the API is down" },
+  "externalURL": "http://alertmanager:9093",
+  "truncatedAlerts": 0,
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": { "alertname": "PayPointBackendAbsent", "namespace": "paypoint", "service": "paypoint-backend", "severity": "critical" },
+      "annotations": { "summary": "No healthy PayPoint backend pod is being scraped: the API is down" },
+      "startsAt": "2026-10-31T12:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph",
+      "fingerprint": "synthetic-0001"
+    }
+  ]
+}

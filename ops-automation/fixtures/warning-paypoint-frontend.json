@@ -1,0 +1,40 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"PayPointBackendAbsent\", namespace=\"paypoint\", service=\"paypoint-backend\"}",
+  "status": "firing",
+  "receiver": "n8n-incidents",
+  "groupLabels": {
+    "alertname": "FrontendSlowResponses",
+    "namespace": "paypoint",
+    "service": "paypoint-frontend"
+  },
+  "commonLabels": {
+    "alertname": "FrontendSlowResponses",
+    "namespace": "paypoint",
+    "service": "paypoint-frontend",
+    "severity": "warning"
+  },
+  "commonAnnotations": {
+    "summary": "Frontend p95 above target"
+  },
+  "externalURL": "http://alertmanager:9093",
+  "truncatedAlerts": 0,
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "FrontendSlowResponses",
+        "namespace": "paypoint",
+        "service": "paypoint-frontend",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "Frontend p95 above target"
+      },
+      "startsAt": "2026-10-31T12:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus:9090/graph",
+      "fingerprint": "synthetic-0001"
+    }
+  ]
+}

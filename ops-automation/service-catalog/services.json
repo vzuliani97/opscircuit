@@ -1,0 +1,22 @@
+{
+  "services": [
+    {
+      "service": "paypoint-backend",
+      "owner": "team-payments-api",
+      "runbook": "runbooks/paypoint-backend.md",
+      "page_severities": ["critical", "warning"]
+    },
+    {
+      "service": "paypoint-frontend",
+      "owner": "team-web",
+      "runbook": "runbooks/paypoint-frontend.md",
+      "page_severities": ["critical"]
+    },
+    {
+      "service": "postgres",
+      "owner": "team-platform",
+      "runbook": "runbooks/postgres.md",
+      "page_severities": ["critical"]
+    }
+  ]
+}
