@@ -10,7 +10,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/vzuliani97/platformops.git
+    repoURL: https://github.com/vzuliani97/opscircuit.git
     targetRevision: main
     path: k8s/overlays/gitops
   destination:

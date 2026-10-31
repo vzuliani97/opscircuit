@@ -4,7 +4,7 @@
 #   ./scripts/drills.sh bad-deploy   a broken release is rolled out; is traffic protected, and does rollback work?
 set -euo pipefail
 
-KUBECTL="kubectl --context kind-platformops -n paypoint"
+KUBECTL="kubectl --context kind-opscircuit -n paypoint"
 WEB="${WEB_URL:-http://localhost:8082}"
 PROMETHEUS="${PROMETHEUS_URL:-http://localhost:9090}"
 
