@@ -1,4 +1,4 @@
-# PlatformOps interview guide
+# OpsCircuit design walkthrough
 
 ## 90-second demo
 

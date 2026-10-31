@@ -11,7 +11,7 @@ terraform {
   # For a real deployment, keep state remotely with locking (the bucket must exist first):
   # backend "s3" {
   #   bucket       = "my-terraform-state-bucket"
-  #   key          = "platformops/aws/terraform.tfstate"
+  #   key          = "opscircuit/aws/terraform.tfstate"
   #   region       = "us-east-1"
   #   encrypt      = true
   #   use_lockfile = true
@@ -23,7 +23,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "platformops"
+      Project     = "opscircuit"
       Environment = var.environment
       ManagedBy   = "terraform"
     }

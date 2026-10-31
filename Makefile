@@ -1,8 +1,8 @@
-CLUSTER      := platformops
+CLUSTER      := opscircuit
 KUBECTL      := kubectl --context kind-$(CLUSTER)
 KIND         := ./bin/kind
 KUBECONFORM  := ./bin/kubeconform
-PAYPOINT_DIR ?= ../paypoint
+PAYPOINT_DIR ?= ../atomictrail
 SECRETS      := k8s/overlays/local/secrets.env
 TF           := docker run --rm -v $(CURDIR)/terraform/aws:/work -w /work hashicorp/terraform:1.16.7
 ARGOCD_VERSION := v3.5.6
