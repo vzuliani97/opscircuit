@@ -136,7 +136,7 @@ services:
     security_opt: ["no-new-privileges:true"]
 
   mock-notifier:
-    image: node:24.22.0-alpine3.24@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+    image: node:26.12.1-alpine3.24@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797
     user: node
     command: ["node", "/app/server.mjs"]
     ports:
