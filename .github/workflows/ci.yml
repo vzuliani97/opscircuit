@@ -42,6 +42,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: shellcheck scripts/*.sh ops-automation/scripts/*.sh ops-automation/db/*.sh ops-automation/n8n/*.sh
+      - name: Published images carry no metadata (GPS, camera, capture time, XMP, IPTC)
+        run: node scripts/image-metadata.mjs check docs
 
   incident-lab:
     name: n8n incident lab (integration tests)
