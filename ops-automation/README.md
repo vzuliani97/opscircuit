@@ -9,7 +9,7 @@ This lab puts a self-hosted n8n workflow between Alertmanager and on-call:
 - It enriches the incident with owner and runbook from a catalog in git.
 - It pages through a retrying notifier, and records anything that still fails for a safe replay.
 
-![n8n incident intake workflow](../docs/screenshots/n8n-incident-intake.png)
+![n8n execution of the incident intake: every step green, from the webhook to the page](../docs/screenshots/n8n-execution-success.png)
 
 ## Quick start
 

@@ -24,6 +24,55 @@ Everything in this repository:
 
 ![Grafana dashboard provisioned as code: pods, sales by status, request rate, p95 latency, error ratio, memory](docs/screenshots/grafana-dashboard.png)
 
+## Processes, step by step
+
+### 1. Deliver with GitOps
+
+```mermaid
+flowchart LR
+  C[Commit to AtomicTrail] --> CI[CI: tests, scans, image]
+  CI --> R[(Container registry)]
+  G[Kustomize overlays in this repo] --> A[Argo CD]
+  R --> A
+  A -->|sync and self-heal| K[kind cluster, 3 nodes]
+```
+
+The AtomicTrail CI publishes images; Argo CD keeps the cluster equal to the overlays in Git. Deleting a Deployment by hand is undone by self-heal in about 2 seconds.
+
+### 2. Observe
+
+Prometheus scrapes both backend replicas and evaluates the alert rules, including an `absent()` rule for total outages; Grafana dashboards are provisioned as code.
+
+![Grafana dashboard provisioned as code](docs/screenshots/grafana-dashboard.png)
+
+### 3. Turn alerts into one incident (n8n)
+
+![n8n execution of the incident intake: every step green, from the Alertmanager webhook to the page](docs/screenshots/n8n-execution-success.png)
+
+| Validate, store, deduplicate | Enrich, decide, page |
+|---|---|
+| ![Webhook, validation, stored delivery, 202, split and fingerprint](docs/screenshots/n8n-intake-validate-dedup.png) | ![Service lookup, catalog and policy, incident upsert, notify and mark notified](docs/screenshots/n8n-intake-enrich-notify.png) |
+
+1. **Alertmanager webhook:** a bearer token is required.
+2. **Validate and normalize:** a malformed batch is stored as a rejected event and answered with `400`.
+3. **Record delivery, then acknowledge `202`:** the delivery is saved before answering, so nothing is lost if a later step fails.
+4. **Split and fingerprint:** each alert gets a SHA-256 of alert name, namespace, service and `startsAt`, one per firing episode.
+5. **Look up service and apply catalog and policy:** owner, runbook and severity come from the service catalog.
+6. **Upsert incident:** `INSERT … ON CONFLICT` in PostgreSQL, so 5 concurrent deliveries of one alert create one incident.
+7. **Should notify? Notify on-call:** only a new incident, or one whose page failed before, is paged. Success marks it notified; a failure becomes a dead letter.
+
+### 4. When something fails
+
+Notifications are retried a bounded number of times. An execution that fails anyway reaches the error workflow, which records a dead letter, and `make replay` processes dead letters again.
+
+| Retry | Dead letter | Lock timeout |
+|---|---|---|
+| ![Retry of a failed notification](docs/screenshots/n8n-execution-retry.png) | ![Dead-letter path](docs/screenshots/n8n-execution-dead-letter.png) | ![Execution stopped by a lock timeout](docs/screenshots/n8n-execution-lock-timeout.png) |
+
+### 5. Practice the bad day
+
+The outage drill removed every backend pod and showed that the "backend down" alert could never fire (no pods, no `up` series); an `absent()` rule fixed it. The bad-release drill was contained and rolled back. Both are in the [postmortem](docs/incidents/2026-10-30-postmortem.md).
+
 ## What is verified (on the local cluster)
 
 | Check | Result | Evidence |

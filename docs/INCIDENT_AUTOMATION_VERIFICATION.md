@@ -61,6 +61,7 @@ Other observed behavior, not part of the suite: a body that is not valid JSON ge
 
 These are captured from the local lab after the suite, with headless Chrome:
 - `docs/screenshots/n8n-incident-intake.png`: the workflow canvas.
+- `docs/screenshots/n8n-execution-success.png`, `n8n-intake-validate-dedup.png`, `n8n-intake-enrich-notify.png`: a successful execution, every step green (2026-11-01).
 - `n8n-execution-retry.png`: notified after retries.
 - `n8n-execution-dead-letter.png`: the error branch.
 - `n8n-execution-lock-timeout.png`: stopped at "Upsert incident" with the lock-timeout error.
