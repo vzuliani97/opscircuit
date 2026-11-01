@@ -8,6 +8,20 @@ A local-first platform engineering and incident-operations lab. It delivers and 
 
 **Problem:** applications go down, get misconfigured or receive broken releases. The team has to notice fast, protect users, and recover with one command.
 
+## What it is for
+
+A small team ships a transactional service to Kubernetes and has to keep it up. This lab shows the whole loop: deliver with GitOps, watch it with metrics and alerts, turn a storm of alert deliveries into one incident and one page, and prove the recovery with drills.
+
+## What I built
+
+Everything in this repository:
+
+- **Platform:** a 3-node kind cluster, Kustomize overlays, Argo CD applications (GitOps), and Prometheus, alert rules and Grafana dashboards provisioned as code.
+- **Hardening:** non-root workloads, NetworkPolicies, Pod Security Admission, resource limits; Checkov with zero failed checks and documented exceptions.
+- **Drills:** a total outage and a broken release, a postmortem, and the fix for an alert that could never fire (`absent()`).
+- **Incident automation (`ops-automation/`):** Alertmanager → self-hosted n8n → PostgreSQL → mock notifier, with an authenticated webhook, validation, the delivery stored before the 202, one incident per firing episode, enrichment with owner and runbook, bounded retries, dead letters and replay; 15 integration tests in CI.
+- **Cloud design:** Terraform for AWS (VPC, EKS, RDS, ECR), validated in CI and never applied, because applying it would cost money.
+
 ![Grafana dashboard provisioned as code: pods, sales by status, request rate, p95 latency, error ratio, memory](docs/screenshots/grafana-dashboard.png)
 
 ## What is verified (on the local cluster)
