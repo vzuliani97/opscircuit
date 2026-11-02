@@ -24,6 +24,17 @@ Everything in this repository:
 
 ![Grafana dashboard provisioned as code: pods, sales by status, request rate, p95 latency, error ratio, memory](docs/screenshots/grafana-dashboard.png)
 
+## Stack
+
+| Layer | Technologies |
+|---|---|
+| Containers and orchestration | Docker, Kubernetes on kind (1 control plane + 2 workers), Kustomize overlays |
+| GitOps and CI/CD | Argo CD 3.5 (sync and self-heal), GitHub Actions (actions pinned by SHA) |
+| Observability | Prometheus 3, Grafana 13 (dashboards as code), Alertmanager 0.34 |
+| Incident automation | n8n 2.43 (self-hosted), PostgreSQL 18, Node.js test runner: 15 integration tests |
+| Infrastructure as code | Terraform with the AWS provider 6 (VPC, EKS, RDS, ECR), validated in CI, never applied |
+| Security and policy | Checkov 3.4, kubeconform, NetworkPolicies, Pod Security Admission, non-root workloads, ShellCheck |
+
 ## Processes, step by step
 
 ### 1. Deliver with GitOps
