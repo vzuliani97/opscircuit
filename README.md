@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/vzuliani97/opscircuit/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/opscircuit/actions/workflows/ci.yml)
 
-A local-first platform engineering and incident-operations lab. It delivers and operates PayPoint, the sample transactional service from [NekoBet](https://github.com/vzuliani97/nekobet): Kubernetes manifests with Kustomize, GitOps with Argo CD, Prometheus and Grafana with alerts, hardened workloads, game-day drills with a postmortem, and the AWS production equivalent in Terraform. Everything runs locally at zero cost on a 3-node kind cluster.
+A local-first platform engineering and incident-operations lab. It delivers and operates [NekoBet](https://github.com/vzuliani97/nekobet), whose code, images and namespace keep its original name, `paypoint`: Kubernetes manifests with Kustomize, GitOps with Argo CD, Prometheus and Grafana with alerts, hardened workloads, game-day drills with a postmortem, and the AWS production equivalent in Terraform. Everything runs locally at zero cost on a 3-node kind cluster.
 
 **Problem:** applications go down, get misconfigured or receive broken releases. The team has to notice fast, protect users, and recover with one command.
 
@@ -90,7 +90,7 @@ The outage drill removed every backend pod and showed that the "backend down" al
 | Check | Result | Evidence |
 |---|---|---|
 | End-to-end smoke test: web, health, login, a confirmed sale, metrics | Pass | `make smoke` |
-| Signed partner sale through nginx inside the cluster | 201 | `scripts/` + PayPoint partner client |
+| Signed partner sale through nginx inside the cluster | 201 | `scripts/` + NekoBet partner client |
 | Prometheus scrapes both backend replicas, on different nodes | 2/2 up | `docs/screenshots/prometheus-targets.png` |
 | NetworkPolicy: an unlabeled pod tries to reach PostgreSQL | `no response` (blocked) | Negative and positive probe |
 | Game day: total backend outage | Found an alert that could never fire; fixed and re-verified | [Postmortem](docs/incidents/2026-10-30-postmortem.md) |
@@ -142,14 +142,14 @@ It runs in Docker Compose with a mock notifier, and its 15 integration tests run
 
 ![n8n execution stopped by a database lock timeout; the error workflow records a replayable dead letter](docs/screenshots/n8n-execution-lock-timeout.png)
 
-GitOps flow: a push to PayPoint runs its tests and publishes images to GHCR; Argo CD keeps the cluster in sync with `k8s/overlays/gitops` on `main` (`prune` + `selfHeal`). Nobody applies changes with `kubectl` in GitOps mode.
+GitOps flow: a push to NekoBet runs its tests and publishes images to GHCR; Argo CD keeps the cluster in sync with `k8s/overlays/gitops` on `main` (`prune` + `selfHeal`). Nobody applies changes with `kubectl` in GitOps mode.
 
 ## Quick start
 
 Requirements: Docker, kubectl, and the `nekobet` repo cloned next to this one (`PAYPOINT_DIR` in the Makefile). `make tools` downloads pinned `kind`, `kubeconform` and the Kyverno CLI into `./bin` and verifies their SHA-256; nothing is installed system-wide.
 
 ```bash
-make up              # cluster + PayPoint + Prometheus/Grafana + smoke test (~5 min)
+make up              # cluster + NekoBet + Prometheus/Grafana + smoke test (~5 min)
 make drill-outage    # game day: total outage
 make drill-bad-deploy
 make policies        # Kyverno admission control with the policies in policies/
@@ -159,7 +159,7 @@ make down
 
 | Service | URL |
 |---|---|
-| PayPoint | http://localhost:8082 |
+| NekoBet | http://localhost:8082 |
 | Grafana (read-only anonymous) | http://localhost:3030 |
 | Prometheus | http://localhost:9090 |
 

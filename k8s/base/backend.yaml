@@ -98,6 +98,11 @@ spec:
                 secretKeyRef:
                   name: paypoint-secrets
                   key: DEMO_PARTNER_SECRET
+            - name: CASINO_PROVIDER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: paypoint-secrets
+                  key: CASINO_PROVIDER_SECRET
           # Migrations run at startup (guarded by an advisory lock), so allow time before liveness kicks in.
           startupProbe:
             httpGet:

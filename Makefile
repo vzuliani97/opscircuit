@@ -34,6 +34,8 @@ images:
 secrets:
 	@test -f $(SECRETS) || printf 'POSTGRES_PASSWORD=%s\nJWT_SECRET=%s\nDEMO_PASSWORD=paypoint-demo\nDEMO_PARTNER_SECRET=%s\n' \
 		"$$(openssl rand -hex 16)" "$$(openssl rand -hex 32)" "$$(openssl rand -hex 24)" > $(SECRETS)
+	@# Added later: an older secrets file gets the key appended instead of being regenerated.
+	@grep -q '^CASINO_PROVIDER_SECRET=' $(SECRETS) || printf 'CASINO_PROVIDER_SECRET=%s\n' "$$(openssl rand -hex 24)" >> $(SECRETS)
 
 deploy: secrets
 	$(KUBECTL) apply -k k8s/overlays/local
