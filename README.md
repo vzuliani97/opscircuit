@@ -177,6 +177,7 @@ make down
 - Default-deny NetworkPolicies: PostgreSQL accepts only the backend; the backend accepts only the frontend and Prometheus. Verified with a blocked probe and an allowed one.
 - Third-party images are pinned by digest. Secrets stay out of git: the local overlay generates them from an ignored file, and GitOps creates them out of band.
 - Prometheus has a read-only ClusterRole on pods only.
+- kind publishes its NodePorts on `127.0.0.1` only, so the app, Grafana and Prometheus are not reachable from the local network. `make validate` fails if a port mapping would listen on every interface.
 - Kyverno admission policies ([`policies/`](policies/)), written in the CEL policy types that replace `ClusterPolicy` (deprecated in Kyverno 1.19): restricted pods with a read-only root filesystem; CPU and memory requests, a memory limit and probes; an explicit image tag; and a cosign keyless signature from NekoBet's CI on `main`. The signature policy checks pods, not Deployments, so Argo CD does not see the digest it pins as drift.
 - CI: Checkov, Gitleaks over the full history, kubeconform, Kyverno policy tests, `terraform validate`, shellcheck, SHA-pinned actions and a least-privilege token.
 

@@ -108,6 +108,10 @@ validate: tools secrets
 		$(KYVERNO) apply $(WORKLOAD_POLICIES) --resource $$out || exit 1; \
 	done
 	$(KYVERNO) test policies/tests
+	@# Every host port of the kind cluster listens on loopback only (kind's default is 0.0.0.0).
+	@test "$$(grep -c 'hostPort:' kind/cluster.yaml)" = "$$(grep -c 'listenAddress: 127.0.0.1' kind/cluster.yaml)" \
+		|| { echo "kind/cluster.yaml: a hostPort is missing listenAddress: 127.0.0.1"; exit 1; }
+	@echo "kind host ports: loopback only"
 
 tf-validate:
 	$(TF) fmt -check -recursive

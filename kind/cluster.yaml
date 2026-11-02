@@ -5,12 +5,16 @@ name: opscircuit
 nodes:
   - role: control-plane
     extraPortMappings:
-      # NodePort services exposed on the host.
+      # NodePort services exposed on the host, on loopback only: kind defaults to 0.0.0.0, which
+      # put the demo login, Grafana and an unauthenticated Prometheus on the local network.
       - containerPort: 30082 # PayPoint web
         hostPort: 8082
+        listenAddress: 127.0.0.1
       - containerPort: 30030 # Grafana
         hostPort: 3030
+        listenAddress: 127.0.0.1
       - containerPort: 30090 # Prometheus
         hostPort: 9090
+        listenAddress: 127.0.0.1
   - role: worker
   - role: worker
