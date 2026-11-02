@@ -187,4 +187,4 @@ Estimated cost of the demo environment in us-east-1: about **USD 140/month** (EK
 
 MIT.
 
-Independent portfolio reconstruction based on engineering patterns from professional work. It uses synthetic data and contains no employer code or confidential information. AI-assisted; verified through tests and CI.
+Independent portfolio reconstruction based on engineering patterns from professional work. It uses synthetic data and contains no employer code or confidential information.
