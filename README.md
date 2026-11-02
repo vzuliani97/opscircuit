@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/vzuliani97/opscircuit/actions/workflows/ci.yml/badge.svg)](https://github.com/vzuliani97/opscircuit/actions/workflows/ci.yml)
 
-A local-first platform engineering and incident-operations lab. It delivers and operates PayPoint, the sample transactional service from [AtomicTrail](https://github.com/vzuliani97/atomictrail): Kubernetes manifests with Kustomize, GitOps with Argo CD, Prometheus and Grafana with alerts, hardened workloads, game-day drills with a postmortem, and the AWS production equivalent in Terraform. Everything runs locally at zero cost on a 3-node kind cluster.
+A local-first platform engineering and incident-operations lab. It delivers and operates PayPoint, the sample transactional service from [NekoBet](https://github.com/vzuliani97/nekobet): Kubernetes manifests with Kustomize, GitOps with Argo CD, Prometheus and Grafana with alerts, hardened workloads, game-day drills with a postmortem, and the AWS production equivalent in Terraform. Everything runs locally at zero cost on a 3-node kind cluster.
 
 **Problem:** applications go down, get misconfigured or receive broken releases. The team has to notice fast, protect users, and recover with one command.
 
@@ -30,14 +30,14 @@ Everything in this repository:
 
 ```mermaid
 flowchart LR
-  C[Commit to AtomicTrail] --> CI[CI: tests, scans, image]
+  C[Commit to NekoBet] --> CI[CI: tests, scans, image]
   CI --> R[(Container registry)]
   G[Kustomize overlays in this repo] --> A[Argo CD]
   R --> A
   A -->|sync and self-heal| K[kind cluster, 3 nodes]
 ```
 
-The AtomicTrail CI publishes images; Argo CD keeps the cluster equal to the overlays in Git. Deleting a Deployment by hand is undone by self-heal in about 2 seconds.
+The NekoBet CI publishes images; Argo CD keeps the cluster equal to the overlays in Git. Deleting a Deployment by hand is undone by self-heal in about 2 seconds.
 
 ### 2. Observe
 
@@ -131,7 +131,7 @@ GitOps flow: a push to PayPoint runs its tests and publishes images to GHCR; Arg
 
 ## Quick start
 
-Requirements: Docker, kubectl, and the `atomictrail` repo cloned next to this one (`PAYPOINT_DIR` in the Makefile). `make tools` downloads pinned `kind` and `kubeconform` into `./bin` and verifies their SHA-256; nothing is installed system-wide.
+Requirements: Docker, kubectl, and the `nekobet` repo cloned next to this one (`PAYPOINT_DIR` in the Makefile). `make tools` downloads pinned `kind` and `kubeconform` into `./bin` and verifies their SHA-256; nothing is installed system-wide.
 
 ```bash
 make up              # cluster + PayPoint + Prometheus/Grafana + smoke test (~5 min)
