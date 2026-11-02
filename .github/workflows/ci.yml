@@ -11,12 +11,14 @@ permissions:
 
 jobs:
   manifests:
-    name: Kubernetes manifests (kustomize + kubeconform)
+    name: Kubernetes manifests (kustomize, kubeconform, Kyverno policies)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Validate every rendered manifest against the Kubernetes schema
+      # Schema and policy checks on every rendered manifest, then the policy tests: each policy must
+      # reject its bad fixture, and only NekoBet's signed image may pass the signature check.
+      - name: Validate rendered manifests and test the admission policies
         run: make validate
 
   terraform:

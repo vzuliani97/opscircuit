@@ -2,13 +2,17 @@ CLUSTER      := opscircuit
 KUBECTL      := kubectl --context kind-$(CLUSTER)
 KIND         := ./bin/kind
 KUBECONFORM  := ./bin/kubeconform
+KYVERNO      := ./bin/kyverno
 PAYPOINT_DIR ?= ../nekobet
 SECRETS      := k8s/overlays/local/secrets.env
 TF           := docker run --rm -v $(CURDIR)/terraform/aws:/work -w /work hashicorp/terraform:1.16.7
 ARGOCD_VERSION := v3.5.6
 K8S_SCHEMA_VERSION := 1.33.0
+# Keep in sync with scripts/install-tools.sh. (A trailing comment would add a space to the value.)
+KYVERNO_VERSION := v1.19.1
+WORKLOAD_POLICIES := policies/restricted-pods.yaml policies/require-resources-and-probes.yaml policies/require-image-tag.yaml
 
-.PHONY: drill-outage drill-bad-deploy up tools cluster images secrets deploy observability argocd gitops-secret gitops argocd-password \
+.PHONY: drill-outage drill-bad-deploy drill-unsigned-image policies up tools cluster images secrets deploy observability argocd gitops-secret gitops argocd-password \
         argocd-ui smoke status validate tf-validate down
 
 ## Full local platform: cluster + PayPoint + Prometheus/Grafana
@@ -77,14 +81,33 @@ drill-outage:
 drill-bad-deploy:
 	./scripts/drills.sh bad-deploy
 
+## Supply chain: an image NekoBet's CI did not sign is refused at admission (run `make policies` first)
+drill-unsigned-image:
+	./scripts/drills.sh unsigned-image
+
+## Kyverno admission control in the cluster, then the policies in policies/
+policies:
+	$(KUBECTL) apply --server-side -f https://github.com/kyverno/kyverno/releases/download/$(KYVERNO_VERSION)/install.yaml
+	$(KUBECTL) -n kyverno rollout status deployment/kyverno-admission-controller --timeout=300s
+	@# The webhook can refuse connections for a few seconds after the rollout reports ready.
+	@for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do \
+		$(KUBECTL) apply -k policies && exit 0; echo "Kyverno webhook not ready, retrying in 5 s"; sleep 5; \
+	done; exit 1
+
 status:
 	$(KUBECTL) get pods -A -o wide | grep -E 'NAMESPACE|paypoint|monitoring|argocd'
 
-## Schema validation of everything kustomize renders (also runs in CI)
+## Schema validation and Kyverno policies on everything kustomize renders, then the policy tests
+## (the image-signature test needs network: it checks GHCR and Sigstore). Also runs in CI.
 validate: tools secrets
+	@mkdir -p rendered
 	@for dir in k8s/overlays/local k8s/overlays/gitops observability; do \
-		echo "== $$dir"; kubectl kustomize $$dir | $(KUBECONFORM) -strict -summary -kubernetes-version $(K8S_SCHEMA_VERSION) - || exit 1; \
+		out=rendered/$$(echo $$dir | tr / -).yaml; echo "== $$dir"; \
+		kubectl kustomize $$dir > $$out || exit 1; \
+		$(KUBECONFORM) -strict -summary -kubernetes-version $(K8S_SCHEMA_VERSION) $$out || exit 1; \
+		$(KYVERNO) apply $(WORKLOAD_POLICIES) --resource $$out || exit 1; \
 	done
+	$(KYVERNO) test policies/tests
 
 tf-validate:
 	$(TF) fmt -check -recursive

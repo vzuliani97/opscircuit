@@ -18,7 +18,8 @@ Everything in this repository:
 
 - **Platform:** a 3-node kind cluster, Kustomize overlays, Argo CD applications (GitOps), and Prometheus, alert rules and Grafana dashboards provisioned as code.
 - **Hardening:** non-root workloads, NetworkPolicies, Pod Security Admission, resource limits; Checkov with zero failed checks and documented exceptions.
-- **Drills:** a total outage and a broken release, a postmortem, and the fix for an alert that could never fire (`absent()`).
+- **Supply chain and admission control:** Kyverno 1.19 with the CEL policy types. Pods must be hardened (restricted profile, read-only root), have requests, a memory limit and probes, and use an explicit tag; only images signed by NekoBet's CI on `main` may run, pinned to the verified digest. Each policy has CLI tests in CI.
+- **Drills:** a total outage, a broken release and an unsigned image, a postmortem, and the fix for an alert that could never fire (`absent()`).
 - **Incident automation (`ops-automation/`):** Alertmanager → self-hosted n8n → PostgreSQL → mock notifier, with an authenticated webhook, validation, the delivery stored before the 202, one incident per firing episode, enrichment with owner and runbook, bounded retries, dead letters and replay; 15 integration tests in CI.
 - **Cloud design:** Terraform for AWS (VPC, EKS, RDS, ECR), validated in CI and never applied, because applying it would cost money.
 
@@ -33,7 +34,7 @@ Everything in this repository:
 | Observability | Prometheus 3, Grafana 13 (dashboards as code), Alertmanager 0.34 |
 | Incident automation | n8n 2.43 (self-hosted), PostgreSQL 18, Node.js test runner: 15 integration tests |
 | Infrastructure as code | Terraform with the AWS provider 6 (VPC, EKS, RDS, ECR), validated in CI, never applied |
-| Security and policy | Checkov 3.4, kubeconform, NetworkPolicies, Pod Security Admission, non-root workloads, ShellCheck |
+| Security and policy | Kyverno 1.19 (`ValidatingPolicy`, `ImageValidatingPolicy`), cosign keyless signature verification, Checkov 3.4, kubeconform, NetworkPolicies, Pod Security Admission, non-root workloads, ShellCheck |
 
 ## Processes, step by step
 
@@ -96,10 +97,13 @@ The outage drill removed every backend pod and showed that the "backend down" al
 | Game day: broken release | Health 200 throughout; rollout stalled; rollback in one command | `docs/incidents/drill-bad-deploy.log` |
 | Checkov on Terraform + rendered manifests | 0 failed checks (33 Terraform, 438 Kubernetes), with accepted findings documented. A clean static scan is not proof of no risk | `.checkov.yaml` |
 | Schema validation of every rendered manifest | 39/39 valid | `make validate` |
+| Kyverno policies on every rendered manifest, and policy tests (each policy rejects its bad fixture; the signature test runs against GHCR and Sigstore) | 24 checks, 0 failures; 29/29 tests | `make validate` |
+| **Admission: bad workloads** (root, no limits or probes, `latest`, untagged) | Each one denied with its message; the real workloads restarted under the policies and the smoke test passes | `make policies`, server dry run |
+| **Admission: unsigned image** (the same backend, built before signing) | Denied; the signed `main` admitted and pinned to its verified digest | [`drill-unsigned-image.log`](docs/incidents/drill-unsigned-image.log) |
 | `terraform validate` and `fmt` | Pass | `make tf-validate` |
 | **GitOps from GitHub**: Argo CD syncs `main`, pulls multi-arch images from GHCR | Synced/Healthy; smoke test passes | Revision on the cluster equals `main` |
 | **Self-heal**: Deployment deleted by hand | Recreated by Argo CD in 2 s | Drill 2026-10-30 |
-| CI on GitHub (validate, Terraform, Checkov, Gitleaks, shellcheck) | Green | Actions tab |
+| CI on GitHub (validate, Kyverno policy tests, Terraform, Checkov, Gitleaks, shellcheck) | Green | Actions tab |
 | **n8n incident automation lab**: authenticated Alertmanager webhook, validation, deduplication, enrichment, bounded retry, dead letters, replay, restart | 15/15 integration tests, locally and in CI | [Verification](docs/INCIDENT_AUTOMATION_VERIFICATION.md) |
 | **Terraform applied on AWS** | **Never applied** (it would cost money) | — |
 
@@ -142,12 +146,14 @@ GitOps flow: a push to PayPoint runs its tests and publishes images to GHCR; Arg
 
 ## Quick start
 
-Requirements: Docker, kubectl, and the `nekobet` repo cloned next to this one (`PAYPOINT_DIR` in the Makefile). `make tools` downloads pinned `kind` and `kubeconform` into `./bin` and verifies their SHA-256; nothing is installed system-wide.
+Requirements: Docker, kubectl, and the `nekobet` repo cloned next to this one (`PAYPOINT_DIR` in the Makefile). `make tools` downloads pinned `kind`, `kubeconform` and the Kyverno CLI into `./bin` and verifies their SHA-256; nothing is installed system-wide.
 
 ```bash
 make up              # cluster + PayPoint + Prometheus/Grafana + smoke test (~5 min)
 make drill-outage    # game day: total outage
 make drill-bad-deploy
+make policies        # Kyverno admission control with the policies in policies/
+make drill-unsigned-image
 make down
 ```
 
@@ -171,7 +177,8 @@ make down
 - Default-deny NetworkPolicies: PostgreSQL accepts only the backend; the backend accepts only the frontend and Prometheus. Verified with a blocked probe and an allowed one.
 - Third-party images are pinned by digest. Secrets stay out of git: the local overlay generates them from an ignored file, and GitOps creates them out of band.
 - Prometheus has a read-only ClusterRole on pods only.
-- CI: Checkov, Gitleaks over the full history, kubeconform, `terraform validate`, shellcheck, SHA-pinned actions and a least-privilege token.
+- Kyverno admission policies ([`policies/`](policies/)), written in the CEL policy types that replace `ClusterPolicy` (deprecated in Kyverno 1.19): restricted pods with a read-only root filesystem; CPU and memory requests, a memory limit and probes; an explicit image tag; and a cosign keyless signature from NekoBet's CI on `main`. The signature policy checks pods, not Deployments, so Argo CD does not see the digest it pins as drift.
+- CI: Checkov, Gitleaks over the full history, kubeconform, Kyverno policy tests, `terraform validate`, shellcheck, SHA-pinned actions and a least-privilege token.
 
 ## Terraform (AWS production equivalent, never applied)
 
@@ -186,7 +193,7 @@ Estimated cost of the demo environment in us-east-1: about **USD 140/month** (EK
 ## Known limitations and next steps
 
 - The cluster's Prometheus does not route to Alertmanager yet. The n8n incident lab runs in Docker Compose next to the cluster; wiring the two together is the next step, together with a blackbox check of the public URL (open action items in the postmortem).
-- The app images use the moving `main` tag in GitOps. Next: Argo CD Image Updater, or a commit that pins the SHA.
+- The app images use the moving `main` tag in GitOps. Kyverno pins each pod to the verified digest, but git still does not record which build runs. Next: Argo CD Image Updater, or a commit that pins the SHA.
 - Secrets are not managed by External Secrets or Sealed Secrets yet.
 - No Ingress or Gateway API with TLS, no HPA, no centralized logs (Loki).
 

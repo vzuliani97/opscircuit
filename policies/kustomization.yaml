@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Kyverno admission policies, applied with `make policies`. The CLI tests in tests/ run in CI.
+resources:
+  - restricted-pods.yaml
+  - require-resources-and-probes.yaml
+  - require-image-tag.yaml
+  - verify-nekobet-images.yaml

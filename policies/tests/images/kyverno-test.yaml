@@ -1,0 +1,21 @@
+# Signature verification against the real registry: the signed build passes, the unsigned build of
+# the same image is refused, and images the policy does not cover are left alone.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: image-signatures
+policies:
+  - ../../verify-nekobet-images.yaml
+resources:
+  - pods.yaml
+results:
+  - policy: verify-nekobet-images
+    isImageValidatingPolicy: true
+    kind: Pod
+    resources: [signed]
+    result: pass
+  - policy: verify-nekobet-images
+    isImageValidatingPolicy: true
+    kind: Pod
+    resources: [unsigned]
+    result: fail

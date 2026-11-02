@@ -1,0 +1,43 @@
+# Only images that NekoBet's CI built and signed on main may run. The signature is cosign keyless:
+# the certificate names the workflow and branch, and the entry is in Sigstore's public log (Rekor),
+# so there is no key to manage and a stolen registry token is not enough to ship an image.
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-nekobet-images
+spec:
+  # Pods only. Rewriting the tag to a digest inside a Deployment would leave Argo CD permanently
+  # out of sync with git, so the controllers keep "main" and each pod gets the verified digest.
+  autogen:
+    podControllers:
+      controllers: []
+  webhookConfiguration:
+    timeoutSeconds: 30
+  failurePolicy: Fail
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  matchImageReferences:
+    - glob: ghcr.io/vzuliani97/paypoint-*
+  validationConfigurations:
+    # The pod runs the exact digest that was verified, not whatever "main" points to a minute later.
+    mutateDigest: true
+    verifyDigest: false
+    required: true
+  attestors:
+    - name: nekobet
+      cosign:
+        keyless:
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              subject: https://github.com/vzuliani97/nekobet/.github/workflows/ci.yml@refs/heads/main
+        ctlog:
+          url: https://rekor.sigstore.dev
+  validations:
+    - expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [attestors.nekobet])).all(e, e > 0)
+      message: The image is not signed by NekoBet's CI on main.

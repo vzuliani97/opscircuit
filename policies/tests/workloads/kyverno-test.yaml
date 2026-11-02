@@ -1,0 +1,68 @@
+# Run with `make validate` (or `bin/kyverno test policies/tests`). Every policy must fail the
+# workloads that break it and pass the others, so a policy that silently stops matching is caught.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: workload-policies
+policies:
+  - ../../restricted-pods.yaml
+  - ../../require-resources-and-probes.yaml
+  - ../../require-image-tag.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: restricted-pods
+    isValidatingPolicy: true
+    kind: Deployment
+    resources: [runs-as-root]
+    result: fail
+  - policy: restricted-pods
+    isValidatingPolicy: true
+    kind: Deployment
+    resources: [compliant, latest-tag]
+    result: pass
+  - policy: restricted-pods
+    isValidatingPolicy: true
+    kind: StatefulSet
+    resources: [no-resources-no-probes]
+    result: pass
+  - policy: restricted-pods
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [untagged]
+    result: pass
+  - policy: require-resources-and-probes
+    isValidatingPolicy: true
+    kind: StatefulSet
+    resources: [no-resources-no-probes]
+    result: fail
+  - policy: require-resources-and-probes
+    isValidatingPolicy: true
+    kind: Deployment
+    resources: [compliant, runs-as-root, latest-tag]
+    result: pass
+  - policy: require-resources-and-probes
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [untagged]
+    result: pass
+  - policy: require-image-tag
+    isValidatingPolicy: true
+    kind: Deployment
+    resources: [latest-tag]
+    result: fail
+  - policy: require-image-tag
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [untagged]
+    result: fail
+  - policy: require-image-tag
+    isValidatingPolicy: true
+    kind: Deployment
+    resources: [compliant, runs-as-root]
+    result: pass
+  - policy: require-image-tag
+    isValidatingPolicy: true
+    kind: StatefulSet
+    resources: [no-resources-no-probes]
+    result: pass

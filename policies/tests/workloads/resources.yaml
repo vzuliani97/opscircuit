@@ -1,0 +1,127 @@
+# One compliant workload, and one workload per policy that breaks exactly that policy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: compliant
+  namespace: paypoint
+spec:
+  selector:
+    matchLabels: { app: compliant }
+  template:
+    metadata:
+      labels: { app: compliant }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: ghcr.io/example/app:1.4.2
+          readinessProbe: { httpGet: { path: /health, port: 8080 } }
+          livenessProbe: { httpGet: { path: /health, port: 8080 } }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+# Breaks restricted-pods: no security context, so it may run as root with every default capability.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runs-as-root
+  namespace: paypoint
+spec:
+  selector:
+    matchLabels: { app: runs-as-root }
+  template:
+    metadata:
+      labels: { app: runs-as-root }
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/example/app:1.4.2
+          readinessProbe: { httpGet: { path: /health, port: 8080 } }
+          livenessProbe: { httpGet: { path: /health, port: 8080 } }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+---
+# Breaks require-resources-and-probes: hardened, but no requests, limits or probes.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: no-resources-no-probes
+  namespace: paypoint
+spec:
+  serviceName: no-resources-no-probes
+  selector:
+    matchLabels: { app: no-resources-no-probes }
+  template:
+    metadata:
+      labels: { app: no-resources-no-probes }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: ghcr.io/example/app:1.4.2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+# Breaks require-image-tag: "latest".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: latest-tag
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels: { app: latest-tag }
+  template:
+    metadata:
+      labels: { app: latest-tag }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: ghcr.io/example/app:latest
+          readinessProbe: { httpGet: { path: /health, port: 8080 } }
+          livenessProbe: { httpGet: { path: /health, port: 8080 } }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+# Breaks require-image-tag: no tag at all, which also means "latest". The registry port is not a tag.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: untagged
+  namespace: paypoint
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile: { type: RuntimeDefault }
+  containers:
+    - name: app
+      image: registry.example.com:5000/team/app
+      readinessProbe: { httpGet: { path: /health, port: 8080 } }
+      livenessProbe: { httpGet: { path: /health, port: 8080 } }
+      resources:
+        requests: { cpu: 50m, memory: 64Mi }
+        limits: { memory: 128Mi }
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: { drop: [ALL] }

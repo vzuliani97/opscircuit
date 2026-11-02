@@ -1,0 +1,4 @@
+04:21:40  START unsigned-image drill
+04:21:44  DENIED ghcr.io/vzuliani97/paypoint-backend:2dfad07d6962b1b28c7d776b522363bf37cc4e48: Error from server: admission webhook "ivpol.validate.kyverno.svc-fail-finegrained-verify-nekobet-images" denied the request: Policy verify-nekobet-images failed: The image is not signed by NekoBet's CI on main.
+04:21:48  ADMITTED ghcr.io/vzuliani97/paypoint-backend:main, pinned to ghcr.io/vzuliani97/paypoint-backend:main@sha256:656c3d9c91b1b276d80e0bdc4ff06f274e78c402311a65f921a661e51cbb8dd7
+04:21:48  END

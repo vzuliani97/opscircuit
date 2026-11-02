@@ -1,0 +1,33 @@
+# Requests let the scheduler place a pod; a memory limit keeps a leak from starving the node.
+# CPU limits are left out on purpose: they throttle a busy pod even when the node has idle CPU.
+# Probes let Kubernetes route traffic only to ready pods and restart stuck ones.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-resources-and-probes
+spec:
+  validationActions: [Deny]
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets]
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [paypoint, monitoring]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - expression: >-
+        (object.spec.containers + object.spec.?initContainers.orValue([])).all(c,
+          'cpu' in c.?resources.?requests.orValue({}) &&
+          'memory' in c.?resources.?requests.orValue({}) &&
+          'memory' in c.?resources.?limits.orValue({}))
+      message: Every container needs CPU and memory requests and a memory limit.
+    - expression: >-
+        object.spec.containers.all(c, has(c.readinessProbe) && has(c.livenessProbe))
+      message: Every container needs a readiness and a liveness probe.

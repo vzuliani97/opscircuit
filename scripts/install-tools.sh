@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Downloads pinned versions of kind and kubeconform into ./bin and verifies their SHA-256 checksums.
+# Downloads pinned versions of kind, kubeconform and the Kyverno CLI into ./bin and verifies their SHA-256 checksums.
 # Nothing is installed system-wide. kubectl and Docker are expected to be installed already.
 set -euo pipefail
 
 KIND_VERSION="v0.33.0"
 KUBECONFORM_VERSION="v0.8.0"
+KYVERNO_VERSION="v1.19.1" # keep in sync with KYVERNO_VERSION in the Makefile
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$ROOT/bin"
@@ -41,5 +42,18 @@ if [[ ! -x "$BIN/kubeconform" ]]; then
   rm -rf "$tmp"
 fi
 
+if [[ ! -x "$BIN/kyverno" ]]; then
+  # Kyverno names the amd64 build "x86_64".
+  archive="kyverno-cli_${KYVERNO_VERSION}_${OS}_${ARCH/amd64/x86_64}.tar.gz"
+  base="https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}"
+  tmp="$(mktemp -d)"
+  curl -fsSLo "$tmp/$archive" "$base/$archive"
+  expected="$(curl -fsSL "$base/checksums.txt" | grep " ${archive}\$" | cut -d' ' -f1)"
+  [[ "$(sha256 "$tmp/$archive")" == "$expected" ]] || { echo "kyverno checksum mismatch" >&2; exit 1; }
+  tar -xzf "$tmp/$archive" -C "$BIN" kyverno
+  rm -rf "$tmp"
+fi
+
 "$BIN/kind" version
 "$BIN/kubeconform" -v
+"$BIN/kyverno" version

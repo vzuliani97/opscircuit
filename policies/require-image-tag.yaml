@@ -1,0 +1,29 @@
+# "latest" (or no tag at all) means a restart can silently run a different build than the one
+# that was tested. Images need an explicit tag or a digest. The moving "main" tag of the gitops
+# overlay is allowed because verify-nekobet-images pins it to the verified digest at admission.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-image-tag
+spec:
+  validationActions: [Deny]
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets]
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [paypoint, monitoring]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - expression: >-
+        (object.spec.containers + object.spec.?initContainers.orValue([])).all(c,
+          c.image.matches('@sha256:[a-f0-9]{64}$') ||
+          (c.image.matches(':[^:/@]+$') && !c.image.endsWith(':latest')))
+      message: Images need an explicit tag other than "latest", or a digest.

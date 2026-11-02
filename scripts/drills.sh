@@ -2,6 +2,7 @@
 # Reproducible incident drills against the local cluster (run `make up` first).
 #   ./scripts/drills.sh outage       backend goes down completely; does an alert fire?
 #   ./scripts/drills.sh bad-deploy   a broken release is rolled out; is traffic protected, and does rollback work?
+#   ./scripts/drills.sh unsigned-image   an image CI did not sign is submitted; does admission refuse it? (`make policies` first)
 set -euo pipefail
 
 KUBECTL="kubectl --context kind-opscircuit -n paypoint"
@@ -52,8 +53,27 @@ bad_deploy() {
   log "END. Revision: $($KUBECTL get deployment/backend -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}'). Health: $(health). Pods: $($KUBECTL get pods -l app=backend --no-headers | awk '{print $2"/"$3}' | tr '\n' ' ')"
 }
 
+unsigned_image() {
+  # Server-side dry run: the request goes through admission (Kyverno included) but nothing is created.
+  # The default namespace is outside the workload policies, so only the signature check applies.
+  local image out
+  log "START unsigned-image drill"
+  for image in \
+    ghcr.io/vzuliani97/paypoint-backend:2dfad07d6962b1b28c7d776b522363bf37cc4e48 \
+    ghcr.io/vzuliani97/paypoint-backend:main; do
+    if out="$(kubectl --context kind-opscircuit -n default run supply-chain-drill --image="$image" --restart=Never \
+      --dry-run=server -o jsonpath='{.spec.containers[0].image}' 2>&1)"; then
+      log "ADMITTED $image, pinned to $out"
+    else
+      log "DENIED $image: $out"
+    fi
+  done
+  log "END"
+}
+
 case "${1:-}" in
   outage) outage ;;
   bad-deploy) bad_deploy ;;
-  *) echo "usage: $0 outage|bad-deploy" >&2; exit 1 ;;
+  unsigned-image) unsigned_image ;;
+  *) echo "usage: $0 outage|bad-deploy|unsigned-image" >&2; exit 1 ;;
 esac

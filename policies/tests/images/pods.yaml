@@ -1,0 +1,33 @@
+# Real images on GHCR, by immutable commit tag (needs network: the CLI checks GHCR and Rekor).
+# Signed: built by NekoBet's CI on main after signing was added (commit 6b0483b).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: signed
+  namespace: paypoint
+spec:
+  containers:
+    - name: backend
+      image: ghcr.io/vzuliani97/paypoint-backend:6b0483be07c63799587ce42c58c9e18c44e83f0f
+---
+# Unsigned: the same image, published by the earlier workflow that did not sign (commit 2dfad07).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: unsigned
+  namespace: paypoint
+spec:
+  containers:
+    - name: backend
+      image: ghcr.io/vzuliani97/paypoint-backend:2dfad07d6962b1b28c7d776b522363bf37cc4e48
+---
+# Not a NekoBet image, so the policy does not apply to it.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: third-party
+  namespace: paypoint
+spec:
+  containers:
+    - name: postgres
+      image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
