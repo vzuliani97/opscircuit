@@ -207,3 +207,7 @@ Estimated cost of the demo environment in us-east-1: about **USD 140/month** (EK
 MIT.
 
 Independent portfolio reconstruction based on engineering patterns from professional work. It uses synthetic data and contains no employer code or confidential information.
+
+## Portfolio
+
+One of four connected projects at [vzuliani97.github.io](https://vzuliani97.github.io). The others: [Yamesi Core](https://github.com/vzuliani97/yamesi) (business operations, online at [yamesi.netlify.app](https://yamesi.netlify.app)), [NekoBet](https://github.com/vzuliani97/nekobet) (transactions and real time, online at [nekobet.netlify.app](https://nekobet.netlify.app)), [Applied Cyber Security](https://github.com/vzuliani97/applied-cybersecurity) (security assessment of NekoBet, Yamesi and OpsCircuit). Case study: https://vzuliani97.github.io/work/opscircuit/
